@@ -9,6 +9,7 @@ public sealed class CinematicCameraController : MonoBehaviour
     [SerializeField] private Transform followTarget;
     [SerializeField] private Vector3 followOffset = new Vector3(0f, 0f, -10f);
     [SerializeField, Min(0.01f)] private float followSharpness = 8f;
+    [SerializeField] private bool followVertical = false; // 상하 추적 여부
 
     [Header("Combat Framing")]
     [SerializeField, Min(0.01f)] private float moveDuration = 0.25f;
@@ -16,6 +17,7 @@ public sealed class CinematicCameraController : MonoBehaviour
     [SerializeField] private Vector3 arenaOffset = new Vector3(0f, 0f, -10f);
 
     private float initialOrthographicSize;
+    private float fixedY; // 고정할 Y값
     private Coroutine activeAnimation;
     private bool isCombatCameraActive;
 
@@ -27,6 +29,7 @@ public sealed class CinematicCameraController : MonoBehaviour
         }
 
         initialOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : 0f;
+        fixedY = transform.position.y; // 시작 위치의 Y를 기준으로 고정
     }
 
     private void FixedUpdate()
@@ -36,8 +39,16 @@ public sealed class CinematicCameraController : MonoBehaviour
             return;
         }
 
+        Vector3 desiredPosition = followTarget.position + followOffset;
+
+        // 상하 추적을 끈 경우, Y는 고정값 유지
+        if (!followVertical)
+        {
+            desiredPosition.y = fixedY;
+        }
+
         float t = 1f - Mathf.Exp(-followSharpness * Time.fixedUnscaledDeltaTime);
-        transform.position = Vector3.Lerp(transform.position, followTarget.position + followOffset, t);
+        transform.position = Vector3.Lerp(transform.position, desiredPosition, t);
     }
 
     /// <summary>Assigns the player that is followed while no combat camera is active.</summary>
@@ -76,6 +87,9 @@ public sealed class CinematicCameraController : MonoBehaviour
             StopCoroutine(activeAnimation);
             activeAnimation = null;
         }
+
+        // 전투 종료 후 복귀 시, 현재 카메라의 Y를 새 고정값으로 갱신
+        fixedY = transform.position.y;
 
         // Keep the current position so the follow interpolation performs the return movement.
         AnimateTo(transform.position, initialOrthographicSize);
