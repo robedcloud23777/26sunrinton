@@ -13,6 +13,15 @@ public class PlayerMovement : MonoBehaviour
     public LayerMask groundLayer = ~0;
     public float checkRadius = 0.2f;
 
+    [Header("One-Way Platform (Maple Style)")]
+    [SerializeField] private LayerMask oneWayPlatformLayer = 1 << 7;
+    [SerializeField, Min(0.05f)] private float dropThroughDuration = 0.35f;
+    [SerializeField, Min(0f)] private float dropDownSpeed = 2f;
+
+    [Header("Trust Rebellion")]
+    [SerializeField, Min(1f)] private float rebellionCheckInterval = 10f;
+    [SerializeField] private Vector2 confusionDurationRange = new Vector2(3f, 5f);
+
     [Header("Animation References")]
     [SerializeField] private Animator anim;
     [SerializeField] private SpriteRenderer spriteRenderer;
@@ -39,9 +48,14 @@ public class PlayerMovement : MonoBehaviour
     private bool isDashing;
     private bool isAttacking;
     private bool isHurt;
+    private float rebellionCheckTimer;
+    private float invertedControlTimer;
+    private Collider2D ignoredPlatform;
+    private Coroutine dropThroughRoutine;
 
     public bool IsGrounded => isGrounded;
     public bool IsBusy => isDashing || isAttacking || isHurt;
+    public bool IsControlsInverted => invertedControlTimer > 0f;
 
     private void Awake()
     {
@@ -64,20 +78,20 @@ public class PlayerMovement : MonoBehaviour
         }
 
         isFacingRight = transform.localScale.x >= 0f;
+        rebellionCheckTimer = rebellionCheckInterval;
     }
 
     private void Update()
     {
+        UpdateTrustRebellion();
+
         if (isHurt || isDashing)
         {
             StopHorizontalMovement();
             return;
         }
 
-        if (Input.GetMouseButtonDown(0) && !isAttacking)
-        {
-            StartCoroutine(AttackRoutine());
-        }
+        
 
         if (isAttacking)
         {
@@ -86,12 +100,21 @@ public class PlayerMovement : MonoBehaviour
         }
 
         horizontalInput = Input.GetAxisRaw("Horizontal");
+        if (IsControlsInverted)
+        {
+            horizontalInput *= -1f;
+        }
+
         SetAnimatorBool(IsRunningHash, !Mathf.Approximately(horizontalInput, 0f));
         FlipTowardsInput();
 
         if (Input.GetButtonDown("Jump") && isGrounded)
         {
-            shouldJump = true;
+            bool wantsToDrop = Input.GetAxisRaw("Vertical") < -0.5f;
+            if (!wantsToDrop || !TryDropThroughPlatform())
+            {
+                shouldJump = true;
+            }
         }
 
         if (Input.GetKeyDown(KeyCode.LeftShift))
@@ -120,14 +143,15 @@ public class PlayerMovement : MonoBehaviour
 
     private bool CheckGrounded()
     {
+        int groundedLayers = groundLayer.value | oneWayPlatformLayer.value;
         if (groundCheck != null)
         {
-            return Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer) != null;
+            return Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundedLayers) != null;
         }
 
         if (bodyCollider != null)
         {
-            return bodyCollider.IsTouchingLayers(groundLayer);
+            return bodyCollider.IsTouchingLayers(groundedLayers);
         }
 
         return false;
@@ -165,6 +189,94 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    private void UpdateTrustRebellion()
+    {
+        if (invertedControlTimer > 0f)
+        {
+            invertedControlTimer = Mathf.Max(0f, invertedControlTimer - Time.unscaledDeltaTime);
+            return;
+        }
+
+        rebellionCheckTimer -= Time.unscaledDeltaTime;
+        if (rebellionCheckTimer > 0f)
+        {
+            return;
+        }
+
+        rebellionCheckTimer = rebellionCheckInterval;
+        TryTriggerRebellion();
+    }
+
+    public bool TryTriggerRebellion()
+    {
+        TrustManager trustManager = TrustManager.Instance;
+        if (trustManager == null || !trustManager.CheckPenaltyRoll())
+        {
+            return false;
+        }
+
+        float minDuration = Mathf.Min(confusionDurationRange.x, confusionDurationRange.y);
+        float maxDuration = Mathf.Max(confusionDurationRange.x, confusionDurationRange.y);
+        invertedControlTimer = UnityEngine.Random.Range(minDuration, maxDuration);
+        return true;
+    }
+
+    /// <summary>Call this from the fall/respawn system when the player falls.</summary>
+    public void RegisterFall()
+    {
+        invertedControlTimer = 0f;
+        rebellionCheckTimer = rebellionCheckInterval;
+        TrustManager.Instance?.ReportFall();
+    }
+
+    private bool TryDropThroughPlatform()
+    {
+        if (bodyCollider == null || dropThroughRoutine != null)
+        {
+            return false;
+        }
+
+        Vector2 rayOrigin = groundCheck != null
+            ? (Vector2)groundCheck.position + Vector2.up * 0.05f
+            : new Vector2(bodyCollider.bounds.center.x, bodyCollider.bounds.min.y + 0.05f);
+        float rayDistance = Mathf.Max(0.2f, checkRadius + 0.2f);
+        RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, rayDistance, oneWayPlatformLayer);
+        if (hit.collider == null ||
+            (hit.collider.GetComponent<OneWayPlatform>() == null &&
+             hit.collider.GetComponent<PlatformEffector2D>() == null))
+        {
+            return false;
+        }
+
+        dropThroughRoutine = StartCoroutine(DropThroughPlatformRoutine(hit.collider));
+        return true;
+    }
+
+    private IEnumerator DropThroughPlatformRoutine(Collider2D platformCollider)
+    {
+        ignoredPlatform = platformCollider;
+        Physics2D.IgnoreCollision(bodyCollider, ignoredPlatform, true);
+        isGrounded = false;
+        shouldJump = false;
+        SetAnimatorBool(IsGroundedHash, false);
+        rb.linearVelocity = new Vector2(rb.linearVelocity.x, Mathf.Min(rb.linearVelocity.y, -dropDownSpeed));
+
+        yield return new WaitForSecondsRealtime(dropThroughDuration);
+
+        RestorePlatformCollision();
+        dropThroughRoutine = null;
+    }
+
+    private void RestorePlatformCollision()
+    {
+        if (bodyCollider != null && ignoredPlatform != null)
+        {
+            Physics2D.IgnoreCollision(bodyCollider, ignoredPlatform, false);
+        }
+
+        ignoredPlatform = null;
+    }
+
     private IEnumerator AttackRoutine()
     {
         isAttacking = true;
@@ -194,6 +306,7 @@ public class PlayerMovement : MonoBehaviour
             return;
         }
 
+        TrustManager.Instance?.ReportNormalHit();
         StartCoroutine(HurtRoutine());
     }
 
@@ -236,12 +349,14 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnDisable()
     {
+        RestorePlatformCollision();
         StopAllCoroutines();
         horizontalInput = 0f;
         shouldJump = false;
         isDashing = false;
         isAttacking = false;
         isHurt = false;
+        dropThroughRoutine = null;
         SetAnimatorBool(IsRunningHash, false);
         SetAnimatorBool(IsDashingHash, false);
 

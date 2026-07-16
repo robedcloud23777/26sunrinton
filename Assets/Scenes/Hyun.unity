@@ -154,7 +154,7 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 11a4b2edb9477417ea438453d1df4276, type: 3}
-  m_Name: 
+  m_Name:
   m_EditorClassIdentifier: Assembly-CSharp::TargetingSystem
   indicatorPrefab: {fileID: 6800270538743214156, guid: b89a9965527f84bdc90d99d5e73a12f2, type: 3}
   indicatorSpawnInterval: 0.08
@@ -173,6 +173,11 @@ MonoBehaviour:
   slashEffectPrefab: {fileID: 6686748003828265265, guid: 297ec17bd21174f27bc5a61f5208f045, type: 3}
   failEffectPrefab: {fileID: 867866686188801793, guid: 27a2852e456594377a1cc01202af2644, type: 3}
   effectLifetime: 1
+  afterimageSpawnInterval: 0.04
+  afterimageLifetime: 0.8
+  afterimageMinDistance: 0.04
+  afterimageColor: {r: 0.45, g: 0.85, b: 1, a: 0.38}
+  afterimageSortingOffset: -1
   sfxSource: {fileID: 0}
   dashImpactSound: {fileID: 0}
   qteSuccessSound: {fileID: 0}
@@ -195,15 +200,17 @@ MonoBehaviour:
   cameraController: {fileID: 1636338751}
   qteController: {fileID: 44530667}
   feedbackManager: {fileID: 44530665}
-  playerMovementController: {fileID: 1427603868}
+  playerMovementController: {fileID: 1427603864}
   introDelay: 0.5
   positioningDuration: 0.35
   slashDuration: 0.16
   rollbackDuration: 0.5
-  finalEnemyDefeatDelay: 1
+  finalEnemyDefeatDelay: 1.25
   damageOnQTEFail: 1
   qteStartDistance: 1.25
   slashOvershootDistance: 0.7
+  slashAfterimageStartFrame: 4
+  slashAfterimageEndFrame: 6
 --- !u!114 &44530667
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -220,6 +227,30 @@ MonoBehaviour:
   minKeys: 3
   maxKeys: 5
   slowMotionScale: 0.1
+--- !u!114 &44530669
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100000000}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7b18c54f4d7d4a7bbf9c77203d5be281, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::TrustManager
+  currentTrust: 50
+  normalHitPenalty: -2
+  fallPenalty: -4
+  qteFailPenalty: -6
+  qtePerfectReward: 2
+  noDamageCombatReward: 5
+  penaltyStartTrust: 25
+  maximumPenaltyProbability: 0.2
+  penaltyCurveExponent: 2
+  bonusStartTrust: 65
+  maximumBonusProbability: 0.35
+  fallPenaltyGracePeriod: 5
 --- !u!4 &44530668
 Transform:
   m_ObjectHideFlags: 0
@@ -1213,6 +1244,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   checkRadius: 0.2
+  oneWayPlatformLayer:
+    serializedVersion: 2
+    m_Bits: 128
+  dropThroughDuration: 0.35
+  dropDownSpeed: 2
+  rebellionCheckInterval: 10
+  confusionDurationRange: {x: 3, y: 5}
   anim: {fileID: 1427603868}
   spriteRenderer: {fileID: 0}
   attackDuration: 0.35
@@ -1995,6 +2033,38 @@ Transform:
   - {fileID: 1901058081}
   m_Father: {fileID: 818692412}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &2100000000
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 2100000001}
+  - component: {fileID: 44530669}
+  m_Layer: 0
+  m_Name: Trust Manager
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &2100000001
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2100000000}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
@@ -2005,3 +2075,4 @@ SceneRoots:
   - {fileID: 818692412}
   - {fileID: 1180372754}
   - {fileID: 1427603870}
+  - {fileID: 2100000001}

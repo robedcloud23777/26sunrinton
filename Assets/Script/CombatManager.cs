@@ -9,6 +9,9 @@ using UnityEngine;
 /// </summary>
 public sealed class CombatManager : MonoBehaviour
 {
+    private static readonly int AttackHash = Animator.StringToHash("attack");
+    private static readonly int AttackStateHash = Animator.StringToHash("Base Layer.Player_Attack");
+
     public static CombatManager Instance { get; private set; }
 
     public enum CombatState
@@ -37,7 +40,7 @@ public sealed class CombatManager : MonoBehaviour
     [SerializeField, Min(0.01f)] private float positioningDuration = 0.35f;
     [SerializeField, Min(0.01f)] private float slashDuration = 0.16f;
     [SerializeField, Min(0.01f)] private float rollbackDuration = 0.5f;
-    [SerializeField, Min(0f)] private float finalEnemyDefeatDelay = 1f;
+    [SerializeField, Min(0f)] private float finalEnemyDefeatDelay = 1.25f;
     [SerializeField, Min(0)] private int damageOnQTEFail = 1;
 
     [Header("Slash Positioning")]
@@ -45,6 +48,12 @@ public sealed class CombatManager : MonoBehaviour
     [SerializeField, Min(0.1f)] private float qteStartDistance = 1.25f;
     [Tooltip("Distance travelled past the target on a successful slash.")]
     [SerializeField, Min(0f)] private float slashOvershootDistance = 0.7f;
+
+    [Header("Slash Animation Frames")]
+    [Tooltip("One-based first attack frame used by the slash and its afterimages.")]
+    [SerializeField, Min(1)] private int slashAfterimageStartFrame = 4;
+    [Tooltip("One-based last attack frame used by the slash and its afterimages.")]
+    [SerializeField, Min(1)] private int slashAfterimageEndFrame = 6;
 
     public event Action<int> OnPlayerDamaged;
     public event Action OnCombatCompleted;
@@ -56,6 +65,17 @@ public sealed class CombatManager : MonoBehaviour
     private Enemy currentTarget;
     private Coroutine activeSequence;
     private Vector3 attackDirection = Vector3.right;
+    private bool autoKillCurrentTarget;
+    private bool playerWasDamagedThisCombat;
+    private bool combatHadTargets;
+    private Rigidbody2D playerRigidbody;
+    private Animator playerAnimator;
+    private AnimationClip playerAttackClip;
+    private float savedGravityScale;
+    private float savedAnimatorSpeed = 1f;
+    private bool isPlayerPhysicsSuspended;
+    private bool isFinalPoseHeld;
+    private bool isSlashAnimationDriven;
 
     private void Awake()
     {
@@ -83,6 +103,9 @@ public sealed class CombatManager : MonoBehaviour
             StopCoroutine(activeSequence);
             activeSequence = null;
         }
+
+        feedbackManager?.EndCombatAfterimages(true);
+        RestorePlayerPresentation();
     }
 
     /// <summary>Assigns references for a scene created entirely by code.</summary>
@@ -114,7 +137,10 @@ public sealed class CombatManager : MonoBehaviour
         playerTransform = player;
         safeRollbackPosition = player.position;
         targetQueue = targetingSystem.GetSortedTargets(player, enemyGroup);
+        combatHadTargets = targetQueue.Count > 0;
+        playerWasDamagedThisCombat = false;
         SetPlayerControl(false);
+        SuspendPlayerPhysics();
         cameraController?.EnterCombat(playerTransform);
 
         currentState = CombatState.Intro;
@@ -153,6 +179,7 @@ public sealed class CombatManager : MonoBehaviour
 
         currentState = CombatState.Dashing;
         currentTarget = targetQueue.Peek();
+        autoKillCurrentTarget = TrustManager.Instance != null && TrustManager.Instance.CheckBonusRoll();
         activeSequence = StartCoroutine(PositionForQTERoutine(currentTarget));
     }
 
@@ -188,6 +215,13 @@ public sealed class CombatManager : MonoBehaviour
         if (target == null)
         {
             PrepareNextAttack();
+            yield break;
+        }
+
+        if (autoKillCurrentTarget)
+        {
+            currentState = CombatState.Resolution;
+            activeSequence = StartCoroutine(SlashThroughTargetRoutine(currentTarget));
             yield break;
         }
 
@@ -240,6 +274,9 @@ public sealed class CombatManager : MonoBehaviour
         Vector3 targetPosition = target.AimPoint.position;
         attackDirection = GetCardinalDirection(start, targetPosition);
         Vector3 destination = targetPosition + attackDirection * slashOvershootDistance;
+        BeginSlashAnimation();
+        feedbackManager?.BeginCombatAfterimages(playerTransform);
+        feedbackManager?.CapturePlayerAfterimage();
         feedbackManager?.PlaySlashFeedback(targetPosition);
 
         float elapsed = 0f;
@@ -251,11 +288,16 @@ public sealed class CombatManager : MonoBehaviour
             }
 
             elapsed += Time.unscaledDeltaTime;
-            playerTransform.position = Vector3.Lerp(start, destination, elapsed / slashDuration);
+            float slashProgress = Mathf.Clamp01(elapsed / slashDuration);
+            SampleSlashAnimation(slashProgress);
+            playerTransform.position = Vector3.Lerp(start, destination, slashProgress);
             yield return null;
         }
 
         playerTransform.position = destination;
+        SampleSlashAnimation(1f);
+        feedbackManager?.CapturePlayerAfterimage();
+        feedbackManager?.EndCombatAfterimages();
         if (target != null)
         {
             Destroy(target.gameObject);
@@ -272,6 +314,7 @@ public sealed class CombatManager : MonoBehaviour
         {
             // Keep the impact framing and slash landing visible before leaving combat.
             currentState = CombatState.Outro;
+            HoldFinalSlashPose();
             if (finalEnemyDefeatDelay > 0f)
             {
                 yield return new WaitForSecondsRealtime(finalEnemyDefeatDelay);
@@ -281,7 +324,68 @@ public sealed class CombatManager : MonoBehaviour
             yield break;
         }
 
+        ReleaseSlashAnimation();
         PrepareNextAttack();
+    }
+
+    private void BeginSlashAnimation()
+    {
+        if (playerAnimator == null)
+        {
+            return;
+        }
+
+        if (playerAnimator.HasState(0, AttackStateHash))
+        {
+            playerAnimator.speed = 0f;
+            isSlashAnimationDriven = true;
+            SampleSlashAnimation(0f);
+        }
+        else
+        {
+            playerAnimator.SetTrigger(AttackHash);
+            playerAnimator.Update(0f);
+        }
+    }
+
+    private void SampleSlashAnimation(float slashProgress)
+    {
+        if (!isSlashAnimationDriven || playerAnimator == null)
+        {
+            return;
+        }
+
+        GetSlashAnimationRange(out float startNormalizedTime, out float endNormalizedTime);
+        float normalizedTime = Mathf.Lerp(startNormalizedTime, endNormalizedTime, slashProgress);
+        playerAnimator.Play(AttackStateHash, 0, normalizedTime);
+        playerAnimator.Update(0f);
+    }
+
+    private void GetSlashAnimationRange(out float startNormalizedTime, out float endNormalizedTime)
+    {
+        if (playerAttackClip == null || playerAttackClip.length <= 0f || playerAttackClip.frameRate <= 0f)
+        {
+            startNormalizedTime = 0f;
+            endNormalizedTime = 1f;
+            return;
+        }
+
+        int startFrame = Mathf.Max(1, slashAfterimageStartFrame);
+        int endFrame = Mathf.Max(startFrame, slashAfterimageEndFrame);
+        float startTime = (startFrame - 1) / playerAttackClip.frameRate;
+        float endTime = (endFrame - 1) / playerAttackClip.frameRate;
+        startNormalizedTime = Mathf.Clamp01(startTime / playerAttackClip.length);
+        endNormalizedTime = Mathf.Clamp01(endTime / playerAttackClip.length);
+    }
+
+    private void ReleaseSlashAnimation()
+    {
+        if (isSlashAnimationDriven && playerAnimator != null)
+        {
+            playerAnimator.speed = savedAnimatorSpeed;
+        }
+
+        isSlashAnimationDriven = false;
     }
 
     private void HandleQTEFail()
@@ -292,6 +396,7 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         currentState = CombatState.Resolution;
+        playerWasDamagedThisCombat = true;
         OnPlayerDamaged?.Invoke(damageOnQTEFail);
         feedbackManager?.PlayFailFeedback(playerTransform.position);
 
@@ -345,10 +450,103 @@ public sealed class CombatManager : MonoBehaviour
         CinematicModeUI.Instance.ExitCinematicMode();
         targetingSystem.ClearIndicators();
         cameraController?.ResetCamera(playerTransform);
+        feedbackManager?.EndCombatAfterimages();
+        RestorePlayerPresentation();
         SetPlayerControl(true);
+
+        if (combatHadTargets && !playerWasDamagedThisCombat)
+        {
+            TrustManager.Instance?.ReportCombatNoDamage();
+        }
+
         currentTarget = null;
+        combatHadTargets = false;
         currentState = CombatState.Idle;
         OnCombatCompleted?.Invoke();
+    }
+
+    private void SuspendPlayerPhysics()
+    {
+        playerRigidbody = playerTransform != null ? playerTransform.GetComponent<Rigidbody2D>() : null;
+        playerAnimator = playerTransform != null ? playerTransform.GetComponentInChildren<Animator>() : null;
+        playerAttackClip = FindAnimationClip(playerAnimator, "Player_Attack");
+
+        if (playerRigidbody != null)
+        {
+            savedGravityScale = playerRigidbody.gravityScale;
+            playerRigidbody.linearVelocity = Vector2.zero;
+            playerRigidbody.gravityScale = 0f;
+            isPlayerPhysicsSuspended = true;
+        }
+
+        if (playerAnimator != null)
+        {
+            savedAnimatorSpeed = playerAnimator.speed;
+        }
+
+        isFinalPoseHeld = false;
+        isSlashAnimationDriven = false;
+    }
+
+    private static AnimationClip FindAnimationClip(Animator animator, string clipName)
+    {
+        if (animator == null || animator.runtimeAnimatorController == null)
+        {
+            return null;
+        }
+
+        foreach (AnimationClip clip in animator.runtimeAnimatorController.animationClips)
+        {
+            if (clip != null && clip.name == clipName)
+            {
+                return clip;
+            }
+        }
+
+        return null;
+    }
+
+    private void HoldFinalSlashPose()
+    {
+        if (playerRigidbody != null)
+        {
+            playerRigidbody.linearVelocity = Vector2.zero;
+        }
+
+        if (playerAnimator != null)
+        {
+            playerAnimator.speed = 0f;
+            isFinalPoseHeld = true;
+        }
+    }
+
+    private void RestorePlayerPresentation()
+    {
+        if ((isFinalPoseHeld || isSlashAnimationDriven) && playerAnimator != null)
+        {
+            playerAnimator.speed = savedAnimatorSpeed;
+        }
+
+        if (isPlayerPhysicsSuspended && playerRigidbody != null)
+        {
+            playerRigidbody.linearVelocity = Vector2.zero;
+            playerRigidbody.gravityScale = savedGravityScale;
+        }
+
+        isFinalPoseHeld = false;
+        isSlashAnimationDriven = false;
+        isPlayerPhysicsSuspended = false;
+        playerRigidbody = null;
+        playerAnimator = null;
+        playerAttackClip = null;
+    }
+
+    /// <summary>Call this when non-QTE combat damage is applied to the player.</summary>
+    public void RegisterPlayerHit(int damage = 1)
+    {
+        playerWasDamagedThisCombat = true;
+        TrustManager.Instance?.ReportNormalHit();
+        OnPlayerDamaged?.Invoke(Mathf.Max(0, damage));
     }
 
     private void SetPlayerControl(bool enabled)

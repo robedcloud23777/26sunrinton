@@ -73,14 +73,16 @@ public sealed class QTEPatternDemoBootstrap : MonoBehaviour
     private void ShowRandomPattern(IReadOnlyList<KeyCode> keys)
     {
         StringBuilder pattern = new StringBuilder();
-        foreach (KeyCode key in keys)
+        for (int keyIndex = 0; keyIndex < keys.Count; keyIndex++)
         {
             if (pattern.Length > 0)
             {
                 pattern.Append("   ");
             }
 
-            pattern.Append(ToArrowSymbol(key));
+            pattern.Append(qteController != null && qteController.IsKeyHidden(keyIndex)
+                ? "?"
+                : ToArrowSymbol(keys[keyIndex]));
         }
 
         patternText.text = pattern.ToString();
