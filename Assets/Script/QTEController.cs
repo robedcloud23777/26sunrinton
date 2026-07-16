@@ -140,7 +140,8 @@ public sealed class QTEController : MonoBehaviour
     private void GenerateHiddenKeyIndices()
     {
         TrustManager trustManager = TrustManager.Instance;
-        if (requiredKeys.Count == 0 || trustManager == null || !trustManager.CheckPenaltyRoll())
+        if (requiredKeys.Count == 0 || trustManager == null ||
+            !trustManager.CheckQuestionMarkRoll())
         {
             return;
         }

@@ -23,10 +23,13 @@ public class CinematicModeUI : MonoBehaviour
     [SerializeField] private Image[] healthIcons;
     [SerializeField] private Scrollbar trustBar;
     [SerializeField, Range(0f, 1f)] private float emptyHealthIconAlpha = 0.18f;
+    [SerializeField, Min(0f)] private float trustBarAnimationDuration = 0.2f;
 
     private Sequence cinematicSequence;
     private CombatManager healthSource;
     private TrustManager trustSource;
+    private Image trustFillImage;
+    private float displayedTrust = float.NaN;
 
     public bool IsCinematicActive { get; private set; }
 
@@ -57,18 +60,73 @@ public class CinematicModeUI : MonoBehaviour
             UpdateHealthHUD(healthSource.CurrentPlayerHealth, healthSource.MaximumPlayerHealth);
         }
 
-        trustSource = TrustManager.Instance;
+        ConfigureTrustBarVisual();
+        BindTrustSource(TrustManager.Instance);
+    }
+
+    private void LateUpdate()
+    {
+        TrustManager activeTrustSource = TrustManager.Instance;
+        if (activeTrustSource != trustSource)
+        {
+            BindTrustSource(activeTrustSource);
+            return;
+        }
+
+        if (trustSource != null &&
+            (float.IsNaN(displayedTrust) ||
+             !Mathf.Approximately(displayedTrust, trustSource.CurrentTrust)))
+        {
+            UpdateTrustHUD(trustSource.CurrentTrust);
+        }
+    }
+
+    private void BindTrustSource(TrustManager source)
+    {
         if (trustSource != null)
         {
             trustSource.OnTrustChanged -= HandleTrustChanged;
-            trustSource.OnTrustChanged += HandleTrustChanged;
-            UpdateTrustHUD(trustSource.CurrentTrust);
         }
 
-        if (trustBar != null)
+        trustSource = source;
+        if (trustSource == null)
         {
-            trustBar.interactable = false;
+            return;
         }
+
+        trustSource.OnTrustChanged -= HandleTrustChanged;
+        trustSource.OnTrustChanged += HandleTrustChanged;
+        UpdateTrustHUD(trustSource.CurrentTrust);
+    }
+
+    private void ConfigureTrustBarVisual()
+    {
+        if (trustBar == null || trustBar.handleRect == null)
+        {
+            return;
+        }
+
+        trustFillImage = trustBar.handleRect.GetComponent<Image>();
+        if (trustFillImage == null)
+        {
+            return;
+        }
+
+        trustBar.transition = Selectable.Transition.None;
+        trustBar.interactable = false;
+        trustBar.enabled = false;
+
+        RectTransform fillRect = trustBar.handleRect;
+        fillRect.anchorMin = Vector2.zero;
+        fillRect.anchorMax = Vector2.one;
+        fillRect.offsetMin = Vector2.zero;
+        fillRect.offsetMax = Vector2.zero;
+
+        trustFillImage.type = Image.Type.Filled;
+        trustFillImage.fillMethod = Image.FillMethod.Horizontal;
+        trustFillImage.fillOrigin = (int)Image.OriginHorizontal.Left;
+        trustFillImage.fillClockwise = true;
+        trustFillImage.raycastTarget = false;
     }
 
     private void UpdateHealthHUD(int currentHealth, int maximumHealth)
@@ -127,7 +185,27 @@ public class CinematicModeUI : MonoBehaviour
         }
 
         float normalizedTrust = Mathf.Clamp01(currentTrust / 100f);
-        trustBar.size = normalizedTrust;
+        bool isFirstUpdate = float.IsNaN(displayedTrust);
+        displayedTrust = currentTrust;
+
+        if (trustFillImage != null)
+        {
+            trustFillImage.DOKill();
+            if (isFirstUpdate || trustBarAnimationDuration <= 0f)
+            {
+                trustFillImage.fillAmount = normalizedTrust;
+            }
+            else
+            {
+                trustFillImage.DOFillAmount(normalizedTrust, trustBarAnimationDuration)
+                    .SetUpdate(true)
+                    .SetEase(Ease.OutCubic);
+            }
+
+            return;
+        }
+
+        trustBar.size = Mathf.Max(0.01f, normalizedTrust);
         trustBar.value = 0f;
     }
 
@@ -208,7 +286,12 @@ public class CinematicModeUI : MonoBehaviour
             trustSource.OnTrustChanged -= HandleTrustChanged;
         }
 
+        trustFillImage?.DOKill();
+
         if (Instance == this)
+        {
             cinematicSequence?.Kill();
+            Instance = null;
+        }
     }
 }

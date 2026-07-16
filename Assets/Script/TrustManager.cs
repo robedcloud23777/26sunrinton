@@ -39,6 +39,13 @@ public sealed class TrustManager : MonoBehaviour
     [SerializeField, Range(0f, 50f)] private float penaltyStartTrust = 25f;
     [SerializeField, Range(0f, 1f)] private float maximumPenaltyProbability = 0.2f;
     [SerializeField, Min(1f)] private float penaltyCurveExponent = 2f;
+
+    [Header("QTE Question Mark")]
+    [SerializeField, Range(0f, 60f)] private float questionMarkStartTrust = 35f;
+    [SerializeField, Range(0f, 1f)] private float maximumQuestionMarkProbability = 0.35f;
+    [SerializeField, Min(1f)] private float questionMarkCurveExponent = 1.4f;
+
+    [Header("High Trust Bonus")]
     [SerializeField, Range(50f, 100f)] private float bonusStartTrust = 65f;
     [SerializeField, Range(0f, 1f)] private float maximumBonusProbability = 0.35f;
 
@@ -76,6 +83,21 @@ public sealed class TrustManager : MonoBehaviour
         }
     }
 
+    public float QuestionMarkProbability
+    {
+        get
+        {
+            if (currentTrust >= questionMarkStartTrust || questionMarkStartTrust <= 0f)
+            {
+                return 0f;
+            }
+
+            float lowTrustProgress = Mathf.InverseLerp(questionMarkStartTrust, 0f, currentTrust);
+            return Mathf.Pow(lowTrustProgress, questionMarkCurveExponent) *
+                   maximumQuestionMarkProbability;
+        }
+    }
+
     private float penaltyBlockedUntil;
 
     private void Awake()
@@ -89,6 +111,7 @@ public sealed class TrustManager : MonoBehaviour
         instance = this;
         currentTrust = Mathf.Clamp(currentTrust, 0f, 100f);
         penaltyCurveExponent = Mathf.Max(1f, penaltyCurveExponent);
+        questionMarkCurveExponent = Mathf.Max(1f, questionMarkCurveExponent);
         DontDestroyOnLoad(gameObject);
     }
 
@@ -136,5 +159,10 @@ public sealed class TrustManager : MonoBehaviour
     public bool CheckBonusRoll()
     {
         return UnityEngine.Random.value < BonusProbability;
+    }
+
+    public bool CheckQuestionMarkRoll()
+    {
+        return UnityEngine.Random.value < QuestionMarkProbability;
     }
 }

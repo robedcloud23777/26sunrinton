@@ -460,6 +460,7 @@ MonoBehaviour:
   - {fileID: 944995223}
   trustBar: {fileID: 1636099846}
   emptyHealthIconAlpha: 0.18
+  trustBarAnimationDuration: 0.2
 --- !u!114 &57956069
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -3505,7 +3506,7 @@ MonoBehaviour:
   aKeySprite: {fileID: 8067954521723550107, guid: 6475f8e360b994c7b879279afe2b61da, type: 3}
   sKeySprite: {fileID: 628984580558405906, guid: 1a6f8fcf831bc4b1f8362346edbf20c2, type: 3}
   dKeySprite: {fileID: 4298813270919121201, guid: 6ed350cc81bae445b91594868f45d350, type: 3}
-  hiddenKeySprite: {fileID: 0}
+  hiddenKeySprite: {fileID: -3486339188171217203, guid: dbc3a0081b93e4e7492a57e50efeee81, type: 3}
   waitingColor: {r: 1, g: 1, b: 1, a: 1}
   successColor: {r: 0, g: 1, b: 0, a: 1}
   failColor: {r: 1, g: 0, b: 0, a: 1}
@@ -9636,6 +9637,9 @@ MonoBehaviour:
   penaltyStartTrust: 25
   maximumPenaltyProbability: 0.2
   penaltyCurveExponent: 2
+  questionMarkStartTrust: 35
+  maximumQuestionMarkProbability: 0.35
+  questionMarkCurveExponent: 1.4
   bonusStartTrust: 65
   maximumBonusProbability: 0.35
   fallPenaltyGracePeriod: 5
