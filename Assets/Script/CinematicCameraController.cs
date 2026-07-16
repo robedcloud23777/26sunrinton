@@ -36,7 +36,7 @@ public sealed class CinematicCameraController : MonoBehaviour
         }
 
         initialOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : 0f;
-        fixedY = transform.position.y; // 시작 위치의 Y를 기준으로 고정
+        //fixedY = transform.position.y; // 시작 위치의 Y를 기준으로 고정
     }
 
     private void FixedUpdate()
@@ -51,7 +51,7 @@ public sealed class CinematicCameraController : MonoBehaviour
         // 상하 추적을 끈 경우, Y는 고정값 유지
         if (!followVertical)
         {
-            desiredPosition.y = fixedY;
+            //desiredPosition.y = fixedY;
         }
 
         float t = 1f - Mathf.Exp(-followSharpness * Time.fixedUnscaledDeltaTime);
@@ -141,7 +141,7 @@ public sealed class CinematicCameraController : MonoBehaviour
         }
 
         // 전투 종료 후 복귀 시, 현재 카메라의 Y를 새 고정값으로 갱신
-        fixedY = transform.position.y;
+       // fixedY = transform.position.y;
 
         // Keep the current position so the follow interpolation performs the return movement.
         AnimateTo(transform.position, initialOrthographicSize);

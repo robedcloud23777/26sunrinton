@@ -16,13 +16,13 @@ public sealed class CombatFeedbackManager : MonoBehaviour
     [SerializeField, Min(0.01f)] private float afterimageSpawnInterval = 0.04f;
     [SerializeField, Min(0.05f)] private float afterimageLifetime = 0.8f;
     [SerializeField, Min(0f)] private float afterimageMinDistance = 0.04f;
-    [SerializeField] private Color afterimageColor = new Color(0.45f, 0.85f, 1f, 0.38f);
-    [SerializeField] private int afterimageSortingOffset = -1;
+    [SerializeField] private Color afterimageColor = new Color(0.55f, 0.95f, 1f, 0.78f);
+    [SerializeField] private int afterimageSortingOffset = 2;
 
     [Header("Intent Negotiation Ghosts")]
-    [SerializeField] private Color characterIntentColor = new Color(0.7f, 0.75f, 0.8f, 0.3f);
-    [SerializeField] private Color playerProposalColor = new Color(1f, 0.72f, 0.12f, 0.45f);
-    [SerializeField] private Color acceptedIntentColor = new Color(1f, 1f, 1f, 0.65f);
+    [SerializeField] private Color characterIntentColor = new Color(0.9f, 0.92f, 0.95f, 0.58f);
+    [SerializeField] private Color playerProposalColor = new Color(1f, 0.78f, 0.15f, 0.78f);
+    [SerializeField] private Color acceptedIntentColor = new Color(1f, 1f, 1f, 0.9f);
     [SerializeField, Range(2, 10)] private int intentGhostCount = 5;
     [SerializeField, Min(0.02f)] private float intentGhostInterval = 0.08f;
     [SerializeField, Min(0.05f)] private float intentGhostLifetime = 0.5f;

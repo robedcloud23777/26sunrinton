@@ -949,8 +949,15 @@ MonoBehaviour:
   afterimageSpawnInterval: 0.04
   afterimageLifetime: 0.8
   afterimageMinDistance: 0.04
-  afterimageColor: {r: 0.45, g: 0.85, b: 1, a: 0.38}
-  afterimageSortingOffset: -1
+  afterimageColor: {r: 0.55, g: 0.95, b: 1, a: 0.78}
+  afterimageSortingOffset: 2
+  characterIntentColor: {r: 0.9, g: 0.92, b: 0.95, a: 0.58}
+  playerProposalColor: {r: 1, g: 0.78, b: 0.15, a: 0.78}
+  acceptedIntentColor: {r: 1, g: 1, b: 1, a: 0.9}
+  intentGhostCount: 5
+  intentGhostInterval: 0.08
+  intentGhostLifetime: 0.5
+  intentLoopPause: 0.12
   sfxSource: {fileID: 0}
   dashImpactSound: {fileID: 0}
   qteSuccessSound: {fileID: 0}
