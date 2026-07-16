@@ -11,8 +11,14 @@ public sealed class QTEUIManager : MonoBehaviour
     [SerializeField] private Transform qteContainer;
     [SerializeField] private GameObject arrowPrefab;
 
+    [Header("WASD Key Sprites")]
+    [SerializeField] private Sprite wKeySprite;
+    [SerializeField] private Sprite aKeySprite;
+    [SerializeField] private Sprite sKeySprite;
+    [SerializeField] private Sprite dKeySprite;
+
     [Header("Feedback")]
-    [SerializeField] private Color waitingColor = Color.gray;
+    [SerializeField] private Color waitingColor = Color.white;
     [SerializeField] private Color successColor = Color.green;
     [SerializeField] private Color failColor = Color.red;
     [SerializeField, Min(0f)] private float failDisplayDuration = 0.3f;
@@ -61,6 +67,15 @@ public sealed class QTEUIManager : MonoBehaviour
         SubscribeToQTE(qteController);
     }
 
+    /// <summary>Assigns the key art used by runtime-generated QTE canvases.</summary>
+    public void ConfigureKeySprites(Sprite wSprite, Sprite aSprite, Sprite sSprite, Sprite dSprite)
+    {
+        wKeySprite = wSprite;
+        aKeySprite = aSprite;
+        sKeySprite = sSprite;
+        dKeySprite = dSprite;
+    }
+
     public void UnsubscribeFromQTE(QTEController qte)
     {
         if (qte == null)
@@ -95,12 +110,15 @@ public sealed class QTEUIManager : MonoBehaviour
                 continue;
             }
 
+            Sprite keySprite = isHidden ? null : GetSpriteForKey(key);
+            arrowImage.sprite = keySprite;
+            arrowImage.preserveAspect = keySprite != null;
             arrowImage.color = waitingColor;
 
             Text arrowLabel = arrowObject.GetComponentInChildren<Text>();
             if (arrowLabel != null)
             {
-                arrowLabel.text = isHidden ? "?" : GetLabelForKey(key);
+                arrowLabel.text = isHidden ? "?" : keySprite == null ? GetLabelForKey(key) : string.Empty;
             }
 
             activeArrows.Add(arrowImage);
@@ -238,6 +256,23 @@ public sealed class QTEUIManager : MonoBehaviour
                 return "D";
             default:
                 return string.Empty;
+        }
+    }
+
+    private Sprite GetSpriteForKey(KeyCode key)
+    {
+        switch (key)
+        {
+            case KeyCode.W:
+                return wKeySprite;
+            case KeyCode.A:
+                return aKeySprite;
+            case KeyCode.S:
+                return sKeySprite;
+            case KeyCode.D:
+                return dKeySprite;
+            default:
+                return null;
         }
     }
 }

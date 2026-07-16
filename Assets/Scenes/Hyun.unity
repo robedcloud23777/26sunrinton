@@ -1141,7 +1141,11 @@ MonoBehaviour:
   qteController: {fileID: 44530667}
   qteContainer: {fileID: 675535136}
   arrowPrefab: {fileID: 1730933460761030626, guid: af25fedf375794d7e8e15574f0a08e78, type: 3}
-  waitingColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
+  wKeySprite: {fileID: 1876778454472326815, guid: 7a9a8cff053ad4e2ea9a61ff2224c83e, type: 3}
+  aKeySprite: {fileID: 8067954521723550107, guid: 6475f8e360b994c7b879279afe2b61da, type: 3}
+  sKeySprite: {fileID: 628984580558405906, guid: 1a6f8fcf831bc4b1f8362346edbf20c2, type: 3}
+  dKeySprite: {fileID: 4298813270919121201, guid: 6ed350cc81bae445b91594868f45d350, type: 3}
+  waitingColor: {r: 1, g: 1, b: 1, a: 1}
   successColor: {r: 0, g: 1, b: 0, a: 1}
   failColor: {r: 1, g: 0, b: 0, a: 1}
   failDisplayDuration: 0.3
