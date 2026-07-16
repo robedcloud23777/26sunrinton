@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>Interpolates after the player during exploration and takes over for combat framing.</summary>
@@ -14,10 +15,15 @@ public sealed class CinematicCameraController : MonoBehaviour
     [SerializeField, Min(0.01f)] private float moveDuration = 0.25f;
     [SerializeField, Min(0.01f)] private float impactZoomSize = 3.5f;
     [SerializeField] private Vector3 arenaOffset = new Vector3(0f, 0f, -10f);
+    [SerializeField] private Vector2 combatFramingPadding = new Vector2(2.25f, 1.75f);
+    [SerializeField, Min(0.01f)] private float minimumCombatSize = 6.5f;
 
     private float initialOrthographicSize;
+    private float fittedCombatSize;
+    private Vector3 fittedCombatCenter;
     private Coroutine activeAnimation;
     private bool isCombatCameraActive;
+    private bool hasFittedCombatFrame;
 
     private void Awake()
     {
@@ -51,6 +57,43 @@ public sealed class CinematicCameraController : MonoBehaviour
     {
         SetFollowTarget(player);
         isCombatCameraActive = true;
+        hasFittedCombatFrame = false;
+    }
+
+    /// <summary>Frames the player and every living enemy inside the orthographic view.</summary>
+    public void FrameCombatants(Transform player, IEnumerable<Enemy> targets)
+    {
+        if (player == null || targetCamera == null || !targetCamera.orthographic)
+        {
+            return;
+        }
+
+        Vector3 minimum = player.position;
+        Vector3 maximum = player.position;
+        if (targets != null)
+        {
+            foreach (Enemy target in targets)
+            {
+                if (target == null)
+                {
+                    continue;
+                }
+
+                Vector3 targetPosition = target.AimPoint.position;
+                minimum = Vector3.Min(minimum, targetPosition);
+                maximum = Vector3.Max(maximum, targetPosition);
+            }
+        }
+
+        fittedCombatCenter = (minimum + maximum) * 0.5f;
+        Vector3 extents = (maximum - minimum) * 0.5f;
+        float aspect = Mathf.Max(0.01f, targetCamera.aspect);
+        float sizeForHeight = extents.y + Mathf.Max(0f, combatFramingPadding.y);
+        float sizeForWidth = (extents.x + Mathf.Max(0f, combatFramingPadding.x)) / aspect;
+        fittedCombatSize = Mathf.Max(minimumCombatSize, sizeForHeight, sizeForWidth);
+        hasFittedCombatFrame = true;
+        isCombatCameraActive = true;
+        AnimateTo(fittedCombatCenter + arenaOffset, fittedCombatSize);
     }
 
     public void MoveToArenaCenter(Vector3 arenaCenter)
@@ -62,6 +105,13 @@ public sealed class CinematicCameraController : MonoBehaviour
     public void ZoomOnImpact(Vector3 impactPosition)
     {
         isCombatCameraActive = true;
+        if (hasFittedCombatFrame)
+        {
+            // Never crop another combatant just to emphasize the current impact.
+            AnimateTo(fittedCombatCenter + arenaOffset, Mathf.Max(impactZoomSize, fittedCombatSize));
+            return;
+        }
+
         AnimateTo(impactPosition + arenaOffset, impactZoomSize);
     }
 
@@ -70,6 +120,7 @@ public sealed class CinematicCameraController : MonoBehaviour
     {
         SetFollowTarget(player);
         isCombatCameraActive = false;
+        hasFittedCombatFrame = false;
 
         if (activeAnimation != null)
         {

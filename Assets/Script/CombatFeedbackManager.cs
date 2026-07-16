@@ -19,6 +19,15 @@ public sealed class CombatFeedbackManager : MonoBehaviour
     [SerializeField] private Color afterimageColor = new Color(0.45f, 0.85f, 1f, 0.38f);
     [SerializeField] private int afterimageSortingOffset = -1;
 
+    [Header("Intent Negotiation Ghosts")]
+    [SerializeField] private Color characterIntentColor = new Color(0.7f, 0.75f, 0.8f, 0.3f);
+    [SerializeField] private Color playerProposalColor = new Color(1f, 0.72f, 0.12f, 0.45f);
+    [SerializeField] private Color acceptedIntentColor = new Color(1f, 1f, 1f, 0.65f);
+    [SerializeField, Range(2, 10)] private int intentGhostCount = 5;
+    [SerializeField, Min(0.02f)] private float intentGhostInterval = 0.08f;
+    [SerializeField, Min(0.05f)] private float intentGhostLifetime = 0.5f;
+    [SerializeField, Min(0f)] private float intentLoopPause = 0.12f;
+
     [Header("Audio")]
     [SerializeField] private AudioSource sfxSource;
     [SerializeField] private AudioClip dashImpactSound;
@@ -27,8 +36,13 @@ public sealed class CombatFeedbackManager : MonoBehaviour
     [SerializeField] private Vector2 pitchRange = new Vector2(0.9f, 1.1f);
 
     private readonly List<GameObject> activeAfterimages = new List<GameObject>();
+    private readonly List<GameObject> activeCharacterIntentGhosts = new List<GameObject>();
+    private readonly List<GameObject> activeProposalGhosts = new List<GameObject>();
+    private readonly List<GameObject> activeAcceptedGhosts = new List<GameObject>();
     private SpriteRenderer afterimageSource;
     private Coroutine afterimageTrailRoutine;
+    private Coroutine characterIntentRoutine;
+    private Coroutine playerProposalRoutine;
 
     private void Awake()
     {
@@ -108,6 +122,171 @@ public sealed class CombatFeedbackManager : MonoBehaviour
         activeAfterimages.Clear();
     }
 
+    public void BeginCharacterIntentPreview(
+        Transform player,
+        Transform target,
+        IReadOnlyList<Sprite> previewSprites)
+    {
+        EndIntentPreviews(true);
+        SpriteRenderer source = player != null ? player.GetComponentInChildren<SpriteRenderer>() : null;
+        if (source != null && target != null)
+        {
+            characterIntentRoutine = StartCoroutine(IntentTrailLoopRoutine(
+                source,
+                target,
+                previewSprites,
+                characterIntentColor,
+                activeCharacterIntentGhosts));
+        }
+    }
+
+    public void BeginPlayerProposalPreview(
+        Transform player,
+        Transform target,
+        IReadOnlyList<Sprite> previewSprites)
+    {
+        EndPlayerProposalPreview(true);
+        SpriteRenderer source = player != null ? player.GetComponentInChildren<SpriteRenderer>() : null;
+        if (source != null && target != null)
+        {
+            playerProposalRoutine = StartCoroutine(IntentTrailLoopRoutine(
+                source,
+                target,
+                previewSprites,
+                playerProposalColor,
+                activeProposalGhosts));
+        }
+    }
+
+    public void EndPlayerProposalPreview(bool clearImmediately)
+    {
+        if (playerProposalRoutine != null)
+        {
+            StopCoroutine(playerProposalRoutine);
+            playerProposalRoutine = null;
+        }
+
+        if (clearImmediately)
+        {
+            ClearGhosts(activeProposalGhosts);
+        }
+    }
+
+    public void ShowAcceptedIntent(
+        Transform player,
+        Transform target,
+        IReadOnlyList<Sprite> previewSprites)
+    {
+        EndIntentPreviews(true);
+        SpriteRenderer source = player != null ? player.GetComponentInChildren<SpriteRenderer>() : null;
+        if (source == null || target == null)
+        {
+            return;
+        }
+
+        Vector3 origin = source.transform.position;
+        for (int i = 0; i < intentGhostCount; i++)
+        {
+            float pathProgress = (i + 1f) / (intentGhostCount + 1f);
+            Vector3 position = Vector3.Lerp(origin, target.position, pathProgress);
+            Sprite attackSprite = GetAttackPreviewSprite(previewSprites, i);
+            SpawnIntentGhost(source, attackSprite, position, acceptedIntentColor, activeAcceptedGhosts);
+        }
+    }
+
+    public void EndIntentPreviews(bool clearImmediately)
+    {
+        if (characterIntentRoutine != null)
+        {
+            StopCoroutine(characterIntentRoutine);
+            characterIntentRoutine = null;
+        }
+
+        if (playerProposalRoutine != null)
+        {
+            StopCoroutine(playerProposalRoutine);
+            playerProposalRoutine = null;
+        }
+
+        if (clearImmediately)
+        {
+            ClearGhosts(activeCharacterIntentGhosts);
+            ClearGhosts(activeProposalGhosts);
+            ClearGhosts(activeAcceptedGhosts);
+        }
+    }
+
+    private IEnumerator IntentTrailLoopRoutine(
+        SpriteRenderer source,
+        Transform target,
+        IReadOnlyList<Sprite> previewSprites,
+        Color ghostColor,
+        List<GameObject> ghostList)
+    {
+        while (source != null && target != null)
+        {
+            Vector3 origin = source.transform.position;
+            for (int i = 0; i < intentGhostCount; i++)
+            {
+                if (source == null || target == null)
+                {
+                    yield break;
+                }
+
+                float pathProgress = (i + 1f) / (intentGhostCount + 1f);
+                Vector3 position = Vector3.Lerp(origin, target.position, pathProgress);
+                Sprite attackSprite = GetAttackPreviewSprite(previewSprites, i);
+                SpawnIntentGhost(source, attackSprite, position, ghostColor, ghostList);
+                yield return new WaitForSecondsRealtime(intentGhostInterval);
+            }
+
+            if (intentLoopPause > 0f)
+            {
+                yield return new WaitForSecondsRealtime(intentLoopPause);
+            }
+        }
+    }
+
+    private void SpawnIntentGhost(
+        SpriteRenderer source,
+        Sprite attackSprite,
+        Vector3 position,
+        Color ghostColor,
+        List<GameObject> ghostList)
+    {
+        if (source == null)
+        {
+            return;
+        }
+
+        if (attackSprite == null)
+        {
+            return;
+        }
+
+        GameObject ghost = new GameObject("Intent Ghost");
+        Transform sourceTransform = source.transform;
+        ghost.transform.SetPositionAndRotation(position, sourceTransform.rotation);
+        ghost.transform.localScale = sourceTransform.lossyScale;
+
+        SpriteRenderer ghostRenderer = ghost.AddComponent<SpriteRenderer>();
+        CopySpriteRenderer(source, ghostRenderer, attackSprite);
+        ghostRenderer.color = ghostColor;
+
+        ghostList.Add(ghost);
+        StartCoroutine(FadeGhostRoutine(ghost, ghostRenderer, intentGhostLifetime, ghostList));
+    }
+
+    private static Sprite GetAttackPreviewSprite(IReadOnlyList<Sprite> previewSprites, int ghostIndex)
+    {
+        if (previewSprites == null || previewSprites.Count == 0)
+        {
+            return null;
+        }
+
+        return previewSprites[ghostIndex % previewSprites.Count];
+    }
+
     private IEnumerator AfterimageTrailRoutine()
     {
         Vector3 previousSpawnPosition = afterimageSource.transform.position;
@@ -144,15 +323,7 @@ public sealed class CombatFeedbackManager : MonoBehaviour
         ghost.transform.localScale = sourceTransform.lossyScale;
 
         SpriteRenderer ghostRenderer = ghost.AddComponent<SpriteRenderer>();
-        ghostRenderer.sprite = afterimageSource.sprite;
-        ghostRenderer.flipX = afterimageSource.flipX;
-        ghostRenderer.flipY = afterimageSource.flipY;
-        ghostRenderer.drawMode = afterimageSource.drawMode;
-        ghostRenderer.size = afterimageSource.size;
-        ghostRenderer.sharedMaterial = afterimageSource.sharedMaterial;
-        ghostRenderer.sortingLayerID = afterimageSource.sortingLayerID;
-        ghostRenderer.sortingOrder = afterimageSource.sortingOrder + afterimageSortingOffset;
-        ghostRenderer.maskInteraction = afterimageSource.maskInteraction;
+        CopySpriteRenderer(afterimageSource, ghostRenderer, afterimageSource.sprite);
 
         Color sourceColor = afterimageSource.color;
         ghostRenderer.color = new Color(
@@ -162,28 +333,58 @@ public sealed class CombatFeedbackManager : MonoBehaviour
             sourceColor.a * afterimageColor.a);
 
         activeAfterimages.Add(ghost);
-        StartCoroutine(FadeAfterimageRoutine(ghost, ghostRenderer));
+        StartCoroutine(FadeGhostRoutine(ghost, ghostRenderer, afterimageLifetime, activeAfterimages));
     }
 
-    private IEnumerator FadeAfterimageRoutine(GameObject ghost, SpriteRenderer ghostRenderer)
+    private void CopySpriteRenderer(SpriteRenderer source, SpriteRenderer destination, Sprite sprite)
+    {
+        destination.sprite = sprite;
+        destination.flipX = source.flipX;
+        destination.flipY = source.flipY;
+        destination.drawMode = source.drawMode;
+        destination.size = source.size;
+        destination.sharedMaterial = source.sharedMaterial;
+        destination.sortingLayerID = source.sortingLayerID;
+        destination.sortingOrder = source.sortingOrder + afterimageSortingOffset;
+        destination.maskInteraction = source.maskInteraction;
+    }
+
+    private IEnumerator FadeGhostRoutine(
+        GameObject ghost,
+        SpriteRenderer ghostRenderer,
+        float lifetime,
+        List<GameObject> ownerList)
     {
         Color startColor = ghostRenderer.color;
         float elapsed = 0f;
 
-        while (ghost != null && elapsed < afterimageLifetime)
+        while (ghost != null && elapsed < lifetime)
         {
             elapsed += Time.unscaledDeltaTime;
             Color fadedColor = startColor;
-            fadedColor.a = Mathf.Lerp(startColor.a, 0f, elapsed / afterimageLifetime);
+            fadedColor.a = Mathf.Lerp(startColor.a, 0f, elapsed / lifetime);
             ghostRenderer.color = fadedColor;
             yield return null;
         }
 
-        activeAfterimages.Remove(ghost);
+        ownerList.Remove(ghost);
         if (ghost != null)
         {
             Destroy(ghost);
         }
+    }
+
+    private void ClearGhosts(List<GameObject> ghosts)
+    {
+        for (int i = ghosts.Count - 1; i >= 0; i--)
+        {
+            if (ghosts[i] != null)
+            {
+                Destroy(ghosts[i]);
+            }
+        }
+
+        ghosts.Clear();
     }
 
     private void SpawnEffect(GameObject prefab, Vector3 position)
@@ -214,5 +415,6 @@ public sealed class CombatFeedbackManager : MonoBehaviour
     private void OnDisable()
     {
         EndCombatAfterimages(true);
+        EndIntentPreviews(true);
     }
 }

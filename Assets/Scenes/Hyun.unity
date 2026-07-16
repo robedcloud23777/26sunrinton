@@ -137,6 +137,7 @@ GameObject:
   - component: {fileID: 44530666}
   - component: {fileID: 44530665}
   - component: {fileID: 44530664}
+  - component: {fileID: 44530670}
   m_Layer: 0
   m_Name: GameSystem
   m_TagString: Untagged
@@ -178,6 +179,13 @@ MonoBehaviour:
   afterimageMinDistance: 0.04
   afterimageColor: {r: 0.45, g: 0.85, b: 1, a: 0.38}
   afterimageSortingOffset: -1
+  characterIntentColor: {r: 0.7, g: 0.75, b: 0.8, a: 0.3}
+  playerProposalColor: {r: 1, g: 0.72, b: 0.12, a: 0.45}
+  acceptedIntentColor: {r: 1, g: 1, b: 1, a: 0.65}
+  intentGhostCount: 5
+  intentGhostInterval: 0.08
+  intentGhostLifetime: 0.5
+  intentLoopPause: 0.12
   sfxSource: {fileID: 0}
   dashImpactSound: {fileID: 0}
   qteSuccessSound: {fileID: 0}
@@ -211,6 +219,13 @@ MonoBehaviour:
   slashOvershootDistance: 0.7
   slashAfterimageStartFrame: 4
   slashAfterimageEndFrame: 6
+  intentDecisionWindow: 3
+  highTrustHoldDuration: 0.35
+  lowTrustHoldDuration: 0.9
+  targetSelectionRadius: 90
+  highTrustAcceptanceDelay: 0.08
+  lowTrustAcceptanceDelay: 0.5
+  intentSelectionUI: {fileID: 44530670}
 --- !u!114 &44530667
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -227,6 +242,23 @@ MonoBehaviour:
   minKeys: 3
   maxKeys: 5
   slowMotionScale: 0.1
+--- !u!114 &44530670
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 44530663}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 5c1f7d613c5141a49eead5ad2234af81, type: 3}
+  m_Name:
+  m_EditorClassIdentifier: Assembly-CSharp::IntentSelectionUI
+  ringSize: 72
+  ringThickness: 7
+  backgroundColor: {r: 1, g: 1, b: 1, a: 0.2}
+  proposalColor: {r: 1, g: 0.72, b: 0.12, a: 0.95}
+  acceptedColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!114 &44530669
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1109,10 +1141,6 @@ MonoBehaviour:
   qteController: {fileID: 44530667}
   qteContainer: {fileID: 675535136}
   arrowPrefab: {fileID: 1730933460761030626, guid: af25fedf375794d7e8e15574f0a08e78, type: 3}
-  upArrow: {fileID: 0}
-  downArrow: {fileID: 0}
-  leftArrow: {fileID: 0}
-  rightArrow: {fileID: 0}
   waitingColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   successColor: {r: 0, g: 1, b: 0, a: 1}
   failColor: {r: 1, g: 0, b: 0, a: 1}
@@ -1736,6 +1764,8 @@ MonoBehaviour:
   moveDuration: 0.25
   impactZoomSize: 3.5
   arenaOffset: {x: 0, y: 0, z: -10}
+  combatFramingPadding: {x: 2.25, y: 1.75}
+  minimumCombatSize: 6.5
 --- !u!114 &1636338752
 MonoBehaviour:
   m_ObjectHideFlags: 0

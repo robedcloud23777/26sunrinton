@@ -202,7 +202,7 @@ public sealed class CombatQTEDemoBootstrap : MonoBehaviour
         text.fontSize = 28;
         text.alignment = TextAnchor.MiddleCenter;
         text.color = Color.white;
-        text.text = "QTE DEMO  •  화면 중앙의 방향키 순서대로 입력하세요";
+        text.text = "QTE DEMO  •  화면 중앙의 W/A/S/D 순서대로 입력하세요";
     }
 
     private static GameObject CreateSpriteObject(string objectName, Color color, Vector3 position, Vector3 scale)

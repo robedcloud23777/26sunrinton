@@ -7,7 +7,7 @@ using UnityEngine.UI;
 
 /// <summary>
 /// A minimal, self-contained QTE verification scene. Add this component to an
-/// empty GameObject and press Play. It starts a new random arrow sequence on
+/// empty GameObject and press Play. It starts a new random WASD sequence on
 /// launch and after each success or failure.
 /// </summary>
 public sealed class QTEPatternDemoBootstrap : MonoBehaviour
@@ -82,11 +82,11 @@ public sealed class QTEPatternDemoBootstrap : MonoBehaviour
 
             pattern.Append(qteController != null && qteController.IsKeyHidden(keyIndex)
                 ? "?"
-                : ToArrowSymbol(keys[keyIndex]));
+                : ToKeyLabel(keys[keyIndex]));
         }
 
         patternText.text = pattern.ToString();
-        statusText.text = "표시된 방향키를 순서대로 입력하세요";
+        statusText.text = "표시된 W/A/S/D 키를 순서대로 입력하세요";
         statusText.color = Color.white;
     }
 
@@ -175,14 +175,14 @@ public sealed class QTEPatternDemoBootstrap : MonoBehaviour
         return text;
     }
 
-    private static string ToArrowSymbol(KeyCode key)
+    private static string ToKeyLabel(KeyCode key)
     {
         switch (key)
         {
-            case KeyCode.UpArrow: return "↑";
-            case KeyCode.DownArrow: return "↓";
-            case KeyCode.LeftArrow: return "←";
-            case KeyCode.RightArrow: return "→";
+            case KeyCode.W: return "W";
+            case KeyCode.A: return "A";
+            case KeyCode.S: return "S";
+            case KeyCode.D: return "D";
             default: return key.ToString();
         }
     }

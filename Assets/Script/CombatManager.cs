@@ -18,6 +18,7 @@ public sealed class CombatManager : MonoBehaviour
     {
         Idle,
         Intro,
+        Negotiating,
         Dashing,
         QTEActive,
         Resolution,
@@ -55,6 +56,15 @@ public sealed class CombatManager : MonoBehaviour
     [Tooltip("One-based last attack frame used by the slash and its afterimages.")]
     [SerializeField, Min(1)] private int slashAfterimageEndFrame = 6;
 
+    [Header("Intent Negotiation")]
+    [SerializeField, Min(0.5f)] private float intentDecisionWindow = 3f;
+    [SerializeField, Min(0.1f)] private float highTrustHoldDuration = 0.35f;
+    [SerializeField, Min(0.1f)] private float lowTrustHoldDuration = 0.9f;
+    [SerializeField, Min(16f)] private float targetSelectionRadius = 90f;
+    [SerializeField, Min(0f)] private float highTrustAcceptanceDelay = 0.08f;
+    [SerializeField, Min(0f)] private float lowTrustAcceptanceDelay = 0.5f;
+    [SerializeField] private IntentSelectionUI intentSelectionUI;
+
     public event Action<int> OnPlayerDamaged;
     public event Action OnCombatCompleted;
     public CombatState CurrentState => currentState;
@@ -86,6 +96,15 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         Instance = this;
+        if (intentSelectionUI == null)
+        {
+            intentSelectionUI = GetComponent<IntentSelectionUI>();
+        }
+
+        if (intentSelectionUI == null)
+        {
+            intentSelectionUI = gameObject.AddComponent<IntentSelectionUI>();
+        }
     }
 
     private void OnEnable()
@@ -105,6 +124,8 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         feedbackManager?.EndCombatAfterimages(true);
+        feedbackManager?.EndIntentPreviews(true);
+        intentSelectionUI?.Hide();
         RestorePlayerPresentation();
     }
 
@@ -152,7 +173,7 @@ public sealed class CombatManager : MonoBehaviour
     {
         if (cameraController != null)
         {
-            cameraController.MoveToArenaCenter(playerTransform.position);
+            cameraController.FrameCombatants(playerTransform, targetQueue);
         }
 
         yield return StartCoroutine(targetingSystem.SpawnIndicatorsRoutine(targetQueue));
@@ -177,10 +198,208 @@ public sealed class CombatManager : MonoBehaviour
             return;
         }
 
-        currentState = CombatState.Dashing;
+        cameraController?.FrameCombatants(playerTransform, targetQueue);
+        currentState = CombatState.Negotiating;
+        activeSequence = StartCoroutine(TargetNegotiationRoutine());
+    }
+
+    private IEnumerator TargetNegotiationRoutine()
+    {
+        RemoveMissingTargets();
+        if (targetQueue.Count == 0)
+        {
+            EndCombat();
+            yield break;
+        }
+
+        Enemy intendedTarget = targetQueue.Peek();
+        currentTarget = intendedTarget;
+        IReadOnlyList<Sprite> previewSprites = CaptureIntentPreviewSprites();
+        feedbackManager?.BeginCharacterIntentPreview(playerTransform, intendedTarget.AimPoint, previewSprites);
+
+        float trustRatio = TrustManager.Instance != null ? TrustManager.Instance.CurrentTrust / 100f : 0.5f;
+        float requiredHoldDuration = Mathf.Lerp(lowTrustHoldDuration, highTrustHoldDuration, trustRatio);
+        float idleDecisionTime = 0f;
+        float heldTime = 0f;
+        Enemy heldTarget = null;
+        Enemy selectedTarget = null;
+
+        while (intendedTarget != null && idleDecisionTime < intentDecisionWindow)
+        {
+            if (!ReferenceEquals(heldTarget, null) && heldTarget == null)
+            {
+                feedbackManager?.EndPlayerProposalPreview(true);
+                intentSelectionUI?.Hide();
+                heldTarget = null;
+                heldTime = 0f;
+            }
+
+            if (heldTarget == null)
+            {
+                idleDecisionTime += Time.unscaledDeltaTime;
+                if (Input.GetMouseButtonDown(0))
+                {
+                    heldTarget = FindTargetNearPointer();
+                    heldTime = 0f;
+                    if (heldTarget != null)
+                    {
+                        feedbackManager?.BeginPlayerProposalPreview(playerTransform, heldTarget.AimPoint, previewSprites);
+                    }
+                }
+            }
+
+            if (heldTarget != null)
+            {
+                if (Input.GetMouseButton(0))
+                {
+                    heldTime += Time.unscaledDeltaTime;
+                    float holdProgress = requiredHoldDuration > 0f ? heldTime / requiredHoldDuration : 1f;
+                    intentSelectionUI?.Show(Input.mousePosition, holdProgress, holdProgress >= 1f);
+                }
+                else if (Input.GetMouseButtonUp(0))
+                {
+                    if (heldTime >= requiredHoldDuration)
+                    {
+                        selectedTarget = heldTarget;
+                    }
+
+                    feedbackManager?.EndPlayerProposalPreview(true);
+                    intentSelectionUI?.Hide();
+                    heldTarget = null;
+                    heldTime = 0f;
+
+                    if (selectedTarget != null)
+                    {
+                        break;
+                    }
+                }
+            }
+
+            yield return null;
+        }
+
+        intentSelectionUI?.Hide();
+        if (intendedTarget == null)
+        {
+            feedbackManager?.EndIntentPreviews(true);
+            PrepareNextAttack();
+            yield break;
+        }
+
+        selectedTarget = selectedTarget != null ? selectedTarget : intendedTarget;
+        PrioritizeTarget(selectedTarget);
         currentTarget = targetQueue.Peek();
+        feedbackManager?.ShowAcceptedIntent(playerTransform, currentTarget.AimPoint, previewSprites);
+
+        bool playerChangedIntent = currentTarget != intendedTarget;
+        float acceptanceDelay = playerChangedIntent
+            ? Mathf.Lerp(lowTrustAcceptanceDelay, highTrustAcceptanceDelay, trustRatio)
+            : highTrustAcceptanceDelay;
+        if (acceptanceDelay > 0f)
+        {
+            yield return new WaitForSecondsRealtime(acceptanceDelay);
+        }
+
+        feedbackManager?.EndIntentPreviews(false);
+        currentState = CombatState.Dashing;
         autoKillCurrentTarget = TrustManager.Instance != null && TrustManager.Instance.CheckBonusRoll();
         activeSequence = StartCoroutine(PositionForQTERoutine(currentTarget));
+    }
+
+    private Enemy FindTargetNearPointer()
+    {
+        Camera gameplayCamera = Camera.main;
+        if (gameplayCamera == null)
+        {
+            return null;
+        }
+
+        Vector2 pointerPosition = Input.mousePosition;
+        float closestDistance = targetSelectionRadius;
+        Enemy closestTarget = null;
+        foreach (Enemy target in targetQueue)
+        {
+            if (target == null)
+            {
+                continue;
+            }
+
+            Vector3 screenPosition = gameplayCamera.WorldToScreenPoint(target.AimPoint.position);
+            if (screenPosition.z < 0f)
+            {
+                continue;
+            }
+
+            float distance = Vector2.Distance(pointerPosition, screenPosition);
+            if (distance <= closestDistance)
+            {
+                closestDistance = distance;
+                closestTarget = target;
+            }
+        }
+
+        return closestTarget;
+    }
+
+    private void PrioritizeTarget(Enemy selectedTarget)
+    {
+        if (selectedTarget == null || targetQueue.Count == 0 || targetQueue.Peek() == selectedTarget)
+        {
+            return;
+        }
+
+        Queue<Enemy> reorderedTargets = new Queue<Enemy>();
+        reorderedTargets.Enqueue(selectedTarget);
+        foreach (Enemy target in targetQueue)
+        {
+            if (target != null && target != selectedTarget)
+            {
+                reorderedTargets.Enqueue(target);
+            }
+        }
+
+        targetQueue = reorderedTargets;
+    }
+
+    private IReadOnlyList<Sprite> CaptureIntentPreviewSprites()
+    {
+        List<Sprite> attackSprites = new List<Sprite>();
+        SpriteRenderer playerRenderer = playerTransform != null
+            ? playerTransform.GetComponentInChildren<SpriteRenderer>()
+            : null;
+        if (playerRenderer == null || playerAnimator == null || playerAttackClip == null ||
+            playerAttackClip.length <= 0f || playerAttackClip.frameRate <= 0f ||
+            !playerAnimator.HasState(0, AttackStateHash))
+        {
+            return attackSprites;
+        }
+
+        AnimatorStateInfo previousState = playerAnimator.GetCurrentAnimatorStateInfo(0);
+        float previousSpeed = playerAnimator.speed;
+        playerAnimator.speed = 0f;
+
+        int startFrame = Mathf.Max(1, slashAfterimageStartFrame);
+        int endFrame = Mathf.Max(startFrame, slashAfterimageEndFrame);
+        for (int frame = startFrame; frame <= endFrame; frame++)
+        {
+            float frameTime = (frame - 1) / playerAttackClip.frameRate;
+            float normalizedTime = Mathf.Clamp01(frameTime / playerAttackClip.length);
+            playerAnimator.Play(AttackStateHash, 0, normalizedTime);
+            playerAnimator.Update(0f);
+            if (playerRenderer.sprite != null)
+            {
+                attackSprites.Add(playerRenderer.sprite);
+            }
+        }
+
+        if (previousState.fullPathHash != 0)
+        {
+            playerAnimator.Play(previousState.fullPathHash, 0, previousState.normalizedTime);
+            playerAnimator.Update(0f);
+        }
+
+        playerAnimator.speed = previousSpeed;
+        return attackSprites;
     }
 
     private IEnumerator PositionForQTERoutine(Enemy target)
@@ -300,13 +519,13 @@ public sealed class CombatManager : MonoBehaviour
         feedbackManager?.EndCombatAfterimages();
         if (target != null)
         {
+            targetingSystem.RemoveIndicator(target);
             Destroy(target.gameObject);
         }
 
         if (targetQueue.Count > 0)
         {
             targetQueue.Dequeue();
-            targetingSystem.RemoveFirstIndicator();
         }
 
         RemoveMissingTargets();
@@ -402,7 +621,7 @@ public sealed class CombatManager : MonoBehaviour
 
         if (cameraController != null)
         {
-            cameraController.MoveToArenaCenter(safeRollbackPosition);
+            cameraController.FrameCombatants(playerTransform, targetQueue);
         }
 
         activeSequence = StartCoroutine(RollbackRoutine());
@@ -428,8 +647,8 @@ public sealed class CombatManager : MonoBehaviour
     {
         while (targetQueue.Count > 0 && targetQueue.Peek() == null)
         {
-            targetQueue.Dequeue();
-            targetingSystem.RemoveFirstIndicator();
+            Enemy missingTarget = targetQueue.Dequeue();
+            targetingSystem.RemoveIndicator(missingTarget);
         }
     }
 
@@ -451,6 +670,8 @@ public sealed class CombatManager : MonoBehaviour
         targetingSystem.ClearIndicators();
         cameraController?.ResetCamera(playerTransform);
         feedbackManager?.EndCombatAfterimages();
+        feedbackManager?.EndIntentPreviews(true);
+        intentSelectionUI?.Hide();
         RestorePlayerPresentation();
         SetPlayerControl(true);
 
