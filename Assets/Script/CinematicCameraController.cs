@@ -12,6 +12,14 @@ public sealed class CinematicCameraController : MonoBehaviour
     [SerializeField, Min(0.01f)] private float followSharpness = 8f;
     [SerializeField] private bool followVertical = false; // 상하 추적 여부
 
+    [Header("Exploration Dead Zone")]
+    [SerializeField] private bool useDeadZone;
+    [SerializeField, Min(0f)] private float deadZoneLeft = 2f;
+    [SerializeField, Min(0f)] private float deadZoneRight = 2f;
+    [SerializeField, Min(0f)] private float deadZoneBottom = 1f;
+    [SerializeField, Min(0f)] private float deadZoneTop = 1.5f;
+    [SerializeField] private bool drawDeadZoneGizmo = true;
+
     [Header("Combat Framing")]
     [SerializeField, Min(0.01f)] private float moveDuration = 0.25f;
     [SerializeField, Min(0.01f)] private float impactZoomSize = 3.5f;
@@ -46,16 +54,51 @@ public sealed class CinematicCameraController : MonoBehaviour
             return;
         }
 
-        Vector3 desiredPosition = followTarget.position + followOffset;
-
-        // 상하 추적을 끈 경우, Y는 고정값 유지
-        if (!followVertical)
+        Vector3 targetPosition = followTarget.position + followOffset;
+        Vector3 desiredPosition;
+        if (useDeadZone)
         {
-            //desiredPosition.y = fixedY;
+            desiredPosition = CalculateDeadZonePosition(targetPosition);
+        }
+        else
+        {
+            desiredPosition = targetPosition;
         }
 
         float t = 1f - Mathf.Exp(-followSharpness * Time.fixedUnscaledDeltaTime);
         transform.position = Vector3.Lerp(transform.position, desiredPosition, t);
+    }
+
+    private Vector3 CalculateDeadZonePosition(Vector3 targetPosition)
+    {
+        Vector3 cameraPosition = transform.position;
+        Vector3 desiredPosition = cameraPosition;
+
+        float horizontalDelta = targetPosition.x - cameraPosition.x;
+        if (horizontalDelta < -deadZoneLeft)
+        {
+            desiredPosition.x = targetPosition.x + deadZoneLeft;
+        }
+        else if (horizontalDelta > deadZoneRight)
+        {
+            desiredPosition.x = targetPosition.x - deadZoneRight;
+        }
+
+        if (followVertical)
+        {
+            float verticalDelta = targetPosition.y - cameraPosition.y;
+            if (verticalDelta < -deadZoneBottom)
+            {
+                desiredPosition.y = targetPosition.y + deadZoneBottom;
+            }
+            else if (verticalDelta > deadZoneTop)
+            {
+                desiredPosition.y = targetPosition.y - deadZoneTop;
+            }
+        }
+
+        desiredPosition.z = targetPosition.z;
+        return desiredPosition;
     }
 
     /// <summary>Assigns the player that is followed while no combat camera is active.</summary>
@@ -189,5 +232,37 @@ public sealed class CinematicCameraController : MonoBehaviour
         }
 
         activeAnimation = null;
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (!useDeadZone || !drawDeadZoneGizmo)
+        {
+            return;
+        }
+
+        Vector3 center = transform.position;
+        Vector3 bottomLeft = new Vector3(
+            center.x - deadZoneLeft,
+            center.y - deadZoneBottom,
+            center.z);
+        Vector3 bottomRight = new Vector3(
+            center.x + deadZoneRight,
+            center.y - deadZoneBottom,
+            center.z);
+        Vector3 topLeft = new Vector3(
+            center.x - deadZoneLeft,
+            center.y + deadZoneTop,
+            center.z);
+        Vector3 topRight = new Vector3(
+            center.x + deadZoneRight,
+            center.y + deadZoneTop,
+            center.z);
+
+        Gizmos.color = new Color(0.2f, 0.9f, 1f, 1f);
+        Gizmos.DrawLine(bottomLeft, bottomRight);
+        Gizmos.DrawLine(bottomRight, topRight);
+        Gizmos.DrawLine(topRight, topLeft);
+        Gizmos.DrawLine(topLeft, bottomLeft);
     }
 }

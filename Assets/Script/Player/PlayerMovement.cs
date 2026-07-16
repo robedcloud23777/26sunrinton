@@ -7,11 +7,14 @@ public class PlayerMovement : MonoBehaviour
     [Header("Movement Settings")]
     public float moveSpeed = 8f;
     public float jumpForce = 12f;
+    [SerializeField] private PhysicsMaterial2D frictionlessMaterial;
 
     [Header("Ground Check (바닥 체크)")]
     public Transform groundCheck;
     public LayerMask groundLayer = ~0;
-    public float checkRadius = 0.2f;
+    [SerializeField] private Vector2 groundCheckSize = new Vector2(0.45f, 0.12f);
+    [SerializeField, Min(0.01f)] private float groundCheckDistance = 0.1f;
+    [SerializeField, Range(0f, 89f)] private float maximumGroundAngle = 60f;
 
     [Header("One-Way Platform (Maple Style)")]
     [SerializeField] private LayerMask oneWayPlatformLayer = 1 << 7;
@@ -43,6 +46,7 @@ public class PlayerMovement : MonoBehaviour
     private Color originalSpriteColor = Color.white;
     private float horizontalInput;
     private bool isGrounded;
+    private Vector2 groundNormal = Vector2.up;
     private bool shouldJump;
     private bool isFacingRight = true;
     private bool isDashing;
@@ -54,6 +58,7 @@ public class PlayerMovement : MonoBehaviour
     private Coroutine dropThroughRoutine;
 
     public bool IsGrounded => isGrounded;
+    public Vector2 GroundNormal => groundNormal;
     public bool IsBusy => isDashing || isAttacking || isHurt;
     public bool IsControlsInverted => invertedControlTimer > 0f;
 
@@ -61,6 +66,11 @@ public class PlayerMovement : MonoBehaviour
     {
         rb = GetComponent<Rigidbody2D>();
         bodyCollider = GetComponent<Collider2D>();
+
+        if (bodyCollider != null && frictionlessMaterial != null)
+        {
+            bodyCollider.sharedMaterial = frictionlessMaterial;
+        }
 
         if (anim == null)
         {
@@ -144,22 +154,80 @@ public class PlayerMovement : MonoBehaviour
     private bool CheckGrounded()
     {
         int groundedLayers = groundLayer.value | oneWayPlatformLayer.value;
+        Vector2 checkOrigin;
         if (groundCheck != null)
         {
-            return Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundedLayers) != null;
+            checkOrigin = groundCheck.position;
         }
-
-        if (bodyCollider != null)
+        else if (bodyCollider != null)
         {
-            return bodyCollider.IsTouchingLayers(groundedLayers);
+            Bounds bounds = bodyCollider.bounds;
+            checkOrigin = new Vector2(
+                bounds.center.x,
+                bounds.min.y + groundCheckSize.y * 0.5f + 0.02f);
+        }
+        else
+        {
+            groundNormal = Vector2.up;
+            return false;
         }
 
-        return false;
+        Vector2 safeCheckSize = new Vector2(
+            Mathf.Max(0.01f, groundCheckSize.x),
+            Mathf.Max(0.01f, groundCheckSize.y));
+        RaycastHit2D hit = Physics2D.BoxCast(
+            checkOrigin,
+            safeCheckSize,
+            0f,
+            Vector2.down,
+            groundCheckDistance,
+            groundedLayers);
+
+        if (hit.collider == null || hit.collider == bodyCollider || hit.collider == ignoredPlatform)
+        {
+            groundNormal = Vector2.up;
+            return false;
+        }
+
+        bool isOneWayPlatform = ((1 << hit.collider.gameObject.layer) & oneWayPlatformLayer.value) != 0;
+        if (isOneWayPlatform && rb.linearVelocity.y > 0.1f)
+        {
+            groundNormal = Vector2.up;
+            return false;
+        }
+
+        Vector2 hitNormal = hit.normal.sqrMagnitude > 0.001f ? hit.normal.normalized : Vector2.up;
+        float groundAngle = Vector2.Angle(hitNormal, Vector2.up);
+        if (groundAngle > maximumGroundAngle)
+        {
+            groundNormal = Vector2.up;
+            return false;
+        }
+
+        groundNormal = hitNormal;
+        return true;
     }
 
     private void Move()
     {
         float velocityX = IsBusy ? 0f : horizontalInput * moveSpeed;
+
+        // Move along the surface tangent so the player follows a slope instead
+        // of repeatedly losing contact with it. Zero velocity while idle also
+        // prevents the rigidbody from slowly drifting down a valid slope.
+        if (isGrounded && rb.linearVelocity.y <= 0.5f)
+        {
+            if (Mathf.Approximately(velocityX, 0f))
+            {
+                rb.linearVelocity = Vector2.zero;
+                return;
+            }
+
+            Vector2 slopeTangent = new Vector2(groundNormal.y, -groundNormal.x).normalized;
+            rb.linearVelocity = slopeTangent * velocityX;
+            return;
+        }
+
         rb.linearVelocity = new Vector2(velocityX, rb.linearVelocity.y);
     }
 
@@ -239,7 +307,7 @@ public class PlayerMovement : MonoBehaviour
         Vector2 rayOrigin = groundCheck != null
             ? (Vector2)groundCheck.position + Vector2.up * 0.05f
             : new Vector2(bodyCollider.bounds.center.x, bodyCollider.bounds.min.y + 0.05f);
-        float rayDistance = Mathf.Max(0.2f, checkRadius + 0.2f);
+        float rayDistance = Mathf.Max(0.2f, groundCheckDistance + groundCheckSize.y + 0.1f);
         RaycastHit2D hit = Physics2D.Raycast(rayOrigin, Vector2.down, rayDistance, oneWayPlatformLayer);
         if (hit.collider == null ||
             (hit.collider.GetComponent<OneWayPlatform>() == null &&
@@ -368,10 +436,16 @@ public class PlayerMovement : MonoBehaviour
 
     private void OnDrawGizmosSelected()
     {
-        if (groundCheck != null)
+        if (groundCheck == null)
         {
-            Gizmos.color = Color.red;
-            Gizmos.DrawWireSphere(groundCheck.position, checkRadius);
+            return;
         }
+
+        Vector3 checkPosition = groundCheck.position;
+        Vector3 castEndPosition = checkPosition + Vector3.down * groundCheckDistance;
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireCube(checkPosition, groundCheckSize);
+        Gizmos.color = Color.yellow;
+        Gizmos.DrawWireCube(castEndPosition, groundCheckSize);
     }
 }

@@ -1058,11 +1058,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 8
   jumpForce: 12
+  frictionlessMaterial: {fileID: 6200000, guid: 6f3a87eced87423a84f08dca1246e5c9, type: 2}
   groundCheck: {fileID: 107005741}
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
-  checkRadius: 0.2
+  groundCheckSize: {x: 0.45, y: 0.12}
+  groundCheckDistance: 0.1
+  maximumGroundAngle: 60
   oneWayPlatformLayer:
     serializedVersion: 2
     m_Bits: 128
