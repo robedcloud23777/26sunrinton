@@ -20,6 +20,7 @@ public sealed class QTEController : MonoBehaviour
 
     public event Action OnQTESuccess;
     public event Action OnQTEFail;
+    public event Action OnQTEImmunityUsed;
     public event Action<IReadOnlyList<KeyCode>> OnQTEGenerated;
     public event Action<int> OnQTEKeyHit;
 
@@ -27,6 +28,7 @@ public sealed class QTEController : MonoBehaviour
     public float RemainingTime => Mathf.Max(0f, timeLimit - elapsedTime);
 
     private readonly List<KeyCode> requiredKeys = new List<KeyCode>();
+    private readonly HashSet<int> hiddenKeyIndices = new HashSet<int>();
     private readonly KeyCode[] possibleKeys =
     {
         KeyCode.UpArrow,
@@ -38,6 +40,7 @@ public sealed class QTEController : MonoBehaviour
     private int currentKeyIndex;
     private float elapsedTime;
     private bool isQTEActive;
+    private bool hasInputImmunity;
     private float previousTimeScale;
     private float previousFixedDeltaTime;
 
@@ -80,6 +83,7 @@ public sealed class QTEController : MonoBehaviour
         Time.fixedDeltaTime = previousFixedDeltaTime * slowMotionScale;
 
         isQTEActive = true;
+        hasInputImmunity = TrustManager.Instance != null && TrustManager.Instance.CheckBonusRoll();
 
         currentKeyIndex = 0;
         elapsedTime = 0f;
@@ -112,6 +116,7 @@ public sealed class QTEController : MonoBehaviour
     private void GenerateRandomPattern()
     {
         requiredKeys.Clear();
+        hiddenKeyIndices.Clear();
         int keyCount = UnityEngine.Random.Range(minKeys, maxKeys + 1);
 
         for (int i = 0; i < keyCount; i++)
@@ -120,9 +125,32 @@ public sealed class QTEController : MonoBehaviour
             requiredKeys.Add(possibleKeys[randomIndex]);
         }
 
+        GenerateHiddenKeyIndices();
+
         // The event notifies listeners after the complete random pattern exists.
         // The read-only view prevents UI code from changing the answer sequence.
         OnQTEGenerated?.Invoke(requiredKeys.AsReadOnly());
+    }
+
+    public bool IsKeyHidden(int keyIndex)
+    {
+        return hiddenKeyIndices.Contains(keyIndex);
+    }
+
+    private void GenerateHiddenKeyIndices()
+    {
+        TrustManager trustManager = TrustManager.Instance;
+        if (requiredKeys.Count == 0 || trustManager == null || !trustManager.CheckPenaltyRoll())
+        {
+            return;
+        }
+
+        int maximumHiddenKeys = Mathf.Min(2, requiredKeys.Count);
+        int hiddenKeyCount = UnityEngine.Random.Range(1, maximumHiddenKeys + 1);
+        while (hiddenKeyIndices.Count < hiddenKeyCount)
+        {
+            hiddenKeyIndices.Add(UnityEngine.Random.Range(0, requiredKeys.Count));
+        }
     }
 
     private void EvaluateDirectionInput()
@@ -134,10 +162,21 @@ public sealed class QTEController : MonoBehaviour
 
         if (pressedKey != requiredKeys[currentKeyIndex])
         {
-            Complete(false);
-            return;
+            if (!hasInputImmunity)
+            {
+                Complete(false);
+                return;
+            }
+
+            hasInputImmunity = false;
+            OnQTEImmunityUsed?.Invoke();
         }
 
+        AcceptCurrentKey();
+    }
+
+    private void AcceptCurrentKey()
+    {
         OnQTEKeyHit?.Invoke(currentKeyIndex);
         currentKeyIndex++;
 
@@ -204,10 +243,16 @@ public sealed class QTEController : MonoBehaviour
 
         if (succeeded)
         {
+            if (elapsedTime <= timeLimit * 0.5f)
+            {
+                TrustManager.Instance?.ReportQTEPerfect();
+            }
+
             OnQTESuccess?.Invoke();
         }
         else
         {
+            TrustManager.Instance?.ReportQTEFail();
             OnQTEFail?.Invoke();
         }
     }

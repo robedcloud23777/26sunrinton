@@ -88,8 +88,10 @@ public sealed class QTEUIManager : MonoBehaviour
             return;
         }
 
-        foreach (KeyCode key in keys)
+        for (int keyIndex = 0; keyIndex < keys.Count; keyIndex++)
         {
+            KeyCode key = keys[keyIndex];
+            bool isHidden = qteController != null && qteController.IsKeyHidden(keyIndex);
             GameObject arrowObject = Instantiate(arrowPrefab, qteContainer);
             arrowObject.SetActive(true);
             Image arrowImage = arrowObject.GetComponent<Image>();
@@ -99,13 +101,13 @@ public sealed class QTEUIManager : MonoBehaviour
                 continue;
             }
 
-            arrowImage.sprite = GetSpriteForKey(key);
+            arrowImage.sprite = isHidden ? null : GetSpriteForKey(key);
             arrowImage.color = waitingColor;
 
             Text arrowLabel = arrowObject.GetComponentInChildren<Text>();
             if (arrowLabel != null)
             {
-                arrowLabel.text = GetLabelForKey(key);
+                arrowLabel.text = isHidden ? "?" : GetLabelForKey(key);
             }
 
             activeArrows.Add(arrowImage);
