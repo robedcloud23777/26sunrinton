@@ -16,6 +16,7 @@ public sealed class QTEUIManager : MonoBehaviour
     [SerializeField] private Sprite aKeySprite;
     [SerializeField] private Sprite sKeySprite;
     [SerializeField] private Sprite dKeySprite;
+    [SerializeField] private Sprite hiddenKeySprite;
 
     [Header("Feedback")]
     [SerializeField] private Color waitingColor = Color.white;
@@ -68,12 +69,18 @@ public sealed class QTEUIManager : MonoBehaviour
     }
 
     /// <summary>Assigns the key art used by runtime-generated QTE canvases.</summary>
-    public void ConfigureKeySprites(Sprite wSprite, Sprite aSprite, Sprite sSprite, Sprite dSprite)
+    public void ConfigureKeySprites(
+        Sprite wSprite,
+        Sprite aSprite,
+        Sprite sSprite,
+        Sprite dSprite,
+        Sprite hiddenSprite = null)
     {
         wKeySprite = wSprite;
         aKeySprite = aSprite;
         sKeySprite = sSprite;
         dKeySprite = dSprite;
+        hiddenKeySprite = hiddenSprite;
     }
 
     public void UnsubscribeFromQTE(QTEController qte)
@@ -110,7 +117,7 @@ public sealed class QTEUIManager : MonoBehaviour
                 continue;
             }
 
-            Sprite keySprite = isHidden ? null : GetSpriteForKey(key);
+            Sprite keySprite = isHidden ? hiddenKeySprite : GetSpriteForKey(key);
             arrowImage.sprite = keySprite;
             arrowImage.preserveAspect = keySprite != null;
             arrowImage.color = waitingColor;
@@ -118,7 +125,9 @@ public sealed class QTEUIManager : MonoBehaviour
             Text arrowLabel = arrowObject.GetComponentInChildren<Text>();
             if (arrowLabel != null)
             {
-                arrowLabel.text = isHidden ? "?" : keySprite == null ? GetLabelForKey(key) : string.Empty;
+                arrowLabel.text = isHidden && keySprite == null
+                    ? "?"
+                    : keySprite == null ? GetLabelForKey(key) : string.Empty;
             }
 
             activeArrows.Add(arrowImage);

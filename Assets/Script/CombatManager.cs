@@ -86,6 +86,7 @@ public sealed class CombatManager : MonoBehaviour
     private bool isPlayerPhysicsSuspended;
     private bool isFinalPoseHeld;
     private bool isSlashAnimationDriven;
+    private PlayerMovement playerMovement;
 
     private void Awake()
     {
@@ -514,6 +515,7 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         playerTransform.position = destination;
+        ResetPlayerFallState();
         SampleSlashAnimation(1f);
         feedbackManager?.CapturePlayerAfterimage();
         feedbackManager?.EndCombatAfterimages();
@@ -689,8 +691,10 @@ public sealed class CombatManager : MonoBehaviour
     private void SuspendPlayerPhysics()
     {
         playerRigidbody = playerTransform != null ? playerTransform.GetComponent<Rigidbody2D>() : null;
+        playerMovement = playerTransform != null ? playerTransform.GetComponent<PlayerMovement>() : null;
         playerAnimator = playerTransform != null ? playerTransform.GetComponentInChildren<Animator>() : null;
         playerAttackClip = FindAnimationClip(playerAnimator, "Player_Attack");
+        playerMovement?.ResetFallDamageTracking();
 
         if (playerRigidbody != null)
         {
@@ -750,6 +754,7 @@ public sealed class CombatManager : MonoBehaviour
 
         if (isPlayerPhysicsSuspended && playerRigidbody != null)
         {
+            ResetPlayerFallState();
             playerRigidbody.linearVelocity = Vector2.zero;
             playerRigidbody.gravityScale = savedGravityScale;
         }
@@ -758,8 +763,19 @@ public sealed class CombatManager : MonoBehaviour
         isSlashAnimationDriven = false;
         isPlayerPhysicsSuspended = false;
         playerRigidbody = null;
+        playerMovement = null;
         playerAnimator = null;
         playerAttackClip = null;
+    }
+
+    private void ResetPlayerFallState()
+    {
+        if (playerRigidbody != null)
+        {
+            playerRigidbody.linearVelocity = Vector2.zero;
+        }
+
+        playerMovement?.ResetFallDamageTracking();
     }
 
     /// <summary>Call this when non-QTE combat damage is applied to the player.</summary>
@@ -768,6 +784,23 @@ public sealed class CombatManager : MonoBehaviour
         playerWasDamagedThisCombat = true;
         TrustManager.Instance?.ReportNormalHit();
         OnPlayerDamaged?.Invoke(Mathf.Max(0, damage));
+    }
+
+    /// <summary>Forwards fall damage without also applying the normal-hit trust penalty.</summary>
+    public void RegisterFallDamage(int damage = 1)
+    {
+        int safeDamage = Mathf.Max(0, damage);
+        if (safeDamage == 0)
+        {
+            return;
+        }
+
+        if (currentState != CombatState.Idle)
+        {
+            playerWasDamagedThisCombat = true;
+        }
+
+        OnPlayerDamaged?.Invoke(safeDamage);
     }
 
     private void SetPlayerControl(bool enabled)
