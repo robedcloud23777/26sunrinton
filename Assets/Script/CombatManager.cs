@@ -72,6 +72,7 @@ public sealed class CombatManager : MonoBehaviour
 
     public event Action<int> OnPlayerDamaged;
     public event Action<int, int> OnPlayerHealthChanged;
+    public event Action OnPlayerDied;
     public event Action OnCombatCompleted;
     public CombatState CurrentState => currentState;
     public int CurrentPlayerHealth => currentPlayerHealth;
@@ -629,6 +630,11 @@ public sealed class CombatManager : MonoBehaviour
         currentState = CombatState.Resolution;
         playerWasDamagedThisCombat = true;
         ApplyPlayerDamage(damageOnQTEFail);
+        if (currentPlayerHealth <= 0)
+        {
+            return;
+        }
+
         feedbackManager?.PlayFailFeedback(playerTransform.position);
 
         if (cameraController != null)
@@ -842,6 +848,11 @@ public sealed class CombatManager : MonoBehaviour
         int appliedDamage = previousHealth - currentPlayerHealth;
         OnPlayerDamaged?.Invoke(appliedDamage);
         OnPlayerHealthChanged?.Invoke(currentPlayerHealth, maximumPlayerHealth);
+
+        if (previousHealth > 0 && currentPlayerHealth == 0)
+        {
+            OnPlayerDied?.Invoke();
+        }
     }
 
     private void SetPlayerControl(bool enabled)

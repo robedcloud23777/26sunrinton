@@ -220,8 +220,9 @@ public sealed class QTEController : MonoBehaviour
         }
 #endif
 
-        // Retain support for projects configured for the legacy Input Manager.
-#if !ENABLE_INPUT_SYSTEM
+        // With Active Input Handling set to Both, keep the legacy path as a
+        // fallback even when the new Input System package is also enabled.
+#if ENABLE_LEGACY_INPUT_MANAGER
         foreach (KeyCode key in possibleKeys)
         {
             if (Input.GetKeyDown(key))
