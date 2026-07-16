@@ -454,6 +454,12 @@ MonoBehaviour:
   vignetteGroup: {fileID: 883373178}
   vignetteTargetAlpha: 0.6
   gameplayUIGroup: {fileID: 707189661}
+  healthIcons:
+  - {fileID: 1672694425}
+  - {fileID: 2078793275}
+  - {fileID: 944995223}
+  trustBar: {fileID: 1636099846}
+  emptyHealthIconAlpha: 0.18
 --- !u!114 &57956069
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -580,7 +586,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 0}
   m_AnchorMax: {x: 0, y: 0}
-  m_AnchoredPosition: {x: 14.3, y: -0.000024795532}
+  m_AnchoredPosition: {x: 14.300003, y: -0.000024795532}
   m_SizeDelta: {x: 20, y: -8.829}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &93900277
@@ -1934,8 +1940,8 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 633945378}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10989.476}
-  m_LocalScale: {x: 29, y: 29, z: 29}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1672694424}
@@ -1945,7 +1951,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 12064.638, y: 31557.102}
+  m_AnchoredPosition: {x: -121.116, y: 39.958}
   m_SizeDelta: {x: 407.51, y: 58.198}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &633945380
@@ -2182,6 +2188,7 @@ GameObject:
   - component: {fileID: 707189663}
   - component: {fileID: 707189662}
   - component: {fileID: 707189661}
+  - component: {fileID: 707189665}
   m_Layer: 5
   m_Name: GameplayUIGroup
   m_TagString: Untagged
@@ -2260,6 +2267,30 @@ RectTransform:
   m_AnchoredPosition: {x: -468, y: 389}
   m_SizeDelta: {x: 702.2094, y: 179.7621}
   m_Pivot: {x: 0.5, y: 0.5}
+--- !u!223 &707189665
+Canvas:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 707189660}
+  m_Enabled: 1
+  serializedVersion: 3
+  m_RenderMode: 0
+  m_Camera: {fileID: 0}
+  m_PlaneDistance: 100
+  m_PixelPerfect: 0
+  m_ReceivesEvents: 0
+  m_OverrideSorting: 1
+  m_OverridePixelPerfect: 0
+  m_SortingBucketNormalizedSize: 0
+  m_VertexColorAlwaysGammaSpace: 0
+  m_UseReflectionProbes: 0
+  m_AdditionalShaderChannelsFlag: 0
+  m_UpdateRectTransformForStandalone: 0
+  m_SortingLayerID: 0
+  m_SortingOrder: 100
+  m_TargetDisplay: 0
 --- !u!1 &730640560
 GameObject:
   m_ObjectHideFlags: 0
@@ -3474,6 +3505,7 @@ MonoBehaviour:
   aKeySprite: {fileID: 8067954521723550107, guid: 6475f8e360b994c7b879279afe2b61da, type: 3}
   sKeySprite: {fileID: 628984580558405906, guid: 1a6f8fcf831bc4b1f8362346edbf20c2, type: 3}
   dKeySprite: {fileID: 4298813270919121201, guid: 6ed350cc81bae445b91594868f45d350, type: 3}
+  hiddenKeySprite: {fileID: 0}
   waitingColor: {r: 1, g: 1, b: 1, a: 1}
   successColor: {r: 0, g: 1, b: 0, a: 1}
   failColor: {r: 1, g: 0, b: 0, a: 1}
@@ -4446,6 +4478,8 @@ MonoBehaviour:
   rollbackDuration: 0.5
   finalEnemyDefeatDelay: 1.25
   damageOnQTEFail: 1
+  maximumPlayerHealth: 12
+  currentPlayerHealth: 12
   qteStartDistance: 1.25
   slashOvershootDistance: 0.7
   slashAfterimageStartFrame: 4
@@ -4709,6 +4743,9 @@ MonoBehaviour:
   moveSpeed: 8
   jumpForce: 12
   frictionlessMaterial: {fileID: 6200000, guid: 6f3a87eced87423a84f08dca1246e5c9, type: 2}
+  wallCheckDistance: 0.08
+  wallCheckHeightRatio: 0.75
+  maximumWallNormalY: 0.2
   groundCheck: {fileID: 29327384}
   groundLayer:
     serializedVersion: 2
@@ -4721,8 +4758,20 @@ MonoBehaviour:
     m_Bits: 128
   dropThroughDuration: 0.35
   dropDownSpeed: 2
+  enableFallDamage: 1
+  minimumFallDistance: 5
+  additionalDamageDistance: 3
+  baseFallDamage: 1
+  maximumFallDamage: 5
   rebellionCheckInterval: 10
   confusionDurationRange: {x: 3, y: 5}
+  rebellionBorderSprite: {fileID: 0}
+  rebellionBorderMaximumAlpha: 0.8
+  rebellionBorderFadeInDuration: 0.65
+  rebellionBorderFadeOutDuration: 0.45
+  rebellionBorderPulseSpeed: 1.8
+  rebellionBorderSortingOrder: 500
+  rebellionTestKey: 111
   anim: {fileID: 1259097847}
   spriteRenderer: {fileID: 0}
   attackDuration: 0.35
@@ -10647,8 +10696,8 @@ RectTransform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1636099844}
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: -10989.476}
-  m_LocalScale: {x: 29, y: 29, z: 29}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children:
   - {fileID: 1068826374}
@@ -10656,7 +10705,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0.5, y: 0.5}
   m_AnchorMax: {x: 0.5, y: 0.5}
-  m_AnchoredPosition: {x: 12064.521, y: 29157.406}
+  m_AnchoredPosition: {x: -121.12, y: -42.79}
   m_SizeDelta: {x: 407.51, y: 65.187}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &1636099846

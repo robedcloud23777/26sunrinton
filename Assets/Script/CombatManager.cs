@@ -44,6 +44,11 @@ public sealed class CombatManager : MonoBehaviour
     [SerializeField, Min(0f)] private float finalEnemyDefeatDelay = 1.25f;
     [SerializeField, Min(0)] private int damageOnQTEFail = 1;
 
+    [Header("Player Health")]
+    [Tooltip("Health uses quarter-heart units. 12 units equal three full hearts.")]
+    [SerializeField, Min(1)] private int maximumPlayerHealth = 12;
+    [SerializeField, Min(0)] private int currentPlayerHealth = 12;
+
     [Header("Slash Positioning")]
     [Tooltip("Distance kept from the target while the player enters QTE input.")]
     [SerializeField, Min(0.1f)] private float qteStartDistance = 1.25f;
@@ -66,8 +71,11 @@ public sealed class CombatManager : MonoBehaviour
     [SerializeField] private IntentSelectionUI intentSelectionUI;
 
     public event Action<int> OnPlayerDamaged;
+    public event Action<int, int> OnPlayerHealthChanged;
     public event Action OnCombatCompleted;
     public CombatState CurrentState => currentState;
+    public int CurrentPlayerHealth => currentPlayerHealth;
+    public int MaximumPlayerHealth => maximumPlayerHealth;
 
     private Transform playerTransform;
     private Vector3 safeRollbackPosition;
@@ -97,6 +105,8 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         Instance = this;
+        maximumPlayerHealth = Mathf.Max(1, maximumPlayerHealth);
+        currentPlayerHealth = Mathf.Clamp(currentPlayerHealth, 0, maximumPlayerHealth);
         if (intentSelectionUI == null)
         {
             intentSelectionUI = GetComponent<IntentSelectionUI>();
@@ -618,7 +628,7 @@ public sealed class CombatManager : MonoBehaviour
 
         currentState = CombatState.Resolution;
         playerWasDamagedThisCombat = true;
-        OnPlayerDamaged?.Invoke(damageOnQTEFail);
+        ApplyPlayerDamage(damageOnQTEFail);
         feedbackManager?.PlayFailFeedback(playerTransform.position);
 
         if (cameraController != null)
@@ -781,9 +791,14 @@ public sealed class CombatManager : MonoBehaviour
     /// <summary>Call this when non-QTE combat damage is applied to the player.</summary>
     public void RegisterPlayerHit(int damage = 1)
     {
+        if (damage <= 0)
+        {
+            return;
+        }
+
         playerWasDamagedThisCombat = true;
         TrustManager.Instance?.ReportNormalHit();
-        OnPlayerDamaged?.Invoke(Mathf.Max(0, damage));
+        ApplyPlayerDamage(damage);
     }
 
     /// <summary>Forwards fall damage without also applying the normal-hit trust penalty.</summary>
@@ -800,7 +815,33 @@ public sealed class CombatManager : MonoBehaviour
             playerWasDamagedThisCombat = true;
         }
 
-        OnPlayerDamaged?.Invoke(safeDamage);
+        ApplyPlayerDamage(safeDamage);
+    }
+
+    public void RestorePlayerHealth(int amount)
+    {
+        if (amount <= 0 || currentPlayerHealth >= maximumPlayerHealth)
+        {
+            return;
+        }
+
+        currentPlayerHealth = Mathf.Min(maximumPlayerHealth, currentPlayerHealth + amount);
+        OnPlayerHealthChanged?.Invoke(currentPlayerHealth, maximumPlayerHealth);
+    }
+
+    private void ApplyPlayerDamage(int damage)
+    {
+        int safeDamage = Mathf.Max(0, damage);
+        if (safeDamage == 0 || currentPlayerHealth <= 0)
+        {
+            return;
+        }
+
+        int previousHealth = currentPlayerHealth;
+        currentPlayerHealth = Mathf.Max(0, currentPlayerHealth - safeDamage);
+        int appliedDamage = previousHealth - currentPlayerHealth;
+        OnPlayerDamaged?.Invoke(appliedDamage);
+        OnPlayerHealthChanged?.Invoke(currentPlayerHealth, maximumPlayerHealth);
     }
 
     private void SetPlayerControl(bool enabled)
