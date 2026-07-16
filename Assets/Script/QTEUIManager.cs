@@ -3,19 +3,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-/// <summary>Renders QTE arrows and reacts to QTEController events only.</summary>
+/// <summary>Renders QTE keycaps and reacts to QTEController events only.</summary>
 public sealed class QTEUIManager : MonoBehaviour
 {
     [Header("References")]
     [SerializeField] private QTEController qteController;
     [SerializeField] private Transform qteContainer;
     [SerializeField] private GameObject arrowPrefab;
-
-    [Header("Arrow Sprites")]
-    [SerializeField] private Sprite upArrow;
-    [SerializeField] private Sprite downArrow;
-    [SerializeField] private Sprite leftArrow;
-    [SerializeField] private Sprite rightArrow;
 
     [Header("Feedback")]
     [SerializeField] private Color waitingColor = Color.gray;
@@ -101,7 +95,6 @@ public sealed class QTEUIManager : MonoBehaviour
                 continue;
             }
 
-            arrowImage.sprite = isHidden ? null : GetSpriteForKey(key);
             arrowImage.color = waitingColor;
 
             Text arrowLabel = arrowObject.GetComponentInChildren<Text>();
@@ -231,35 +224,18 @@ public sealed class QTEUIManager : MonoBehaviour
         activeArrows.Clear();
     }
 
-    private Sprite GetSpriteForKey(KeyCode key)
-    {
-        switch (key)
-        {
-            case KeyCode.UpArrow:
-                return upArrow;
-            case KeyCode.DownArrow:
-                return downArrow;
-            case KeyCode.LeftArrow:
-                return leftArrow;
-            case KeyCode.RightArrow:
-                return rightArrow;
-            default:
-                return null;
-        }
-    }
-
     private static string GetLabelForKey(KeyCode key)
     {
         switch (key)
         {
-            case KeyCode.UpArrow:
-                return "↑";
-            case KeyCode.DownArrow:
-                return "↓";
-            case KeyCode.LeftArrow:
-                return "←";
-            case KeyCode.RightArrow:
-                return "→";
+            case KeyCode.W:
+                return "W";
+            case KeyCode.A:
+                return "A";
+            case KeyCode.S:
+                return "S";
+            case KeyCode.D:
+                return "D";
             default:
                 return string.Empty;
         }

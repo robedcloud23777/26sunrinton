@@ -6,7 +6,7 @@ using UnityEngine.InputSystem;
 #endif
 
 /// <summary>
-/// Generates and evaluates an arrow-key quick-time event.  This component owns
+/// Generates and evaluates a WASD quick-time event. This component owns
 /// input evaluation and slow motion only; presentation and combat consequences
 /// are provided to subscribers through events.
 /// </summary>
@@ -31,10 +31,10 @@ public sealed class QTEController : MonoBehaviour
     private readonly HashSet<int> hiddenKeyIndices = new HashSet<int>();
     private readonly KeyCode[] possibleKeys =
     {
-        KeyCode.UpArrow,
-        KeyCode.DownArrow,
-        KeyCode.LeftArrow,
-        KeyCode.RightArrow
+        KeyCode.W,
+        KeyCode.A,
+        KeyCode.S,
+        KeyCode.D
     };
 
     private int currentKeyIndex;
@@ -109,7 +109,7 @@ public sealed class QTEController : MonoBehaviour
     }
 
     /// <summary>
-    /// Creates a new random arrow-key sequence and publishes it to the UI.
+    /// Creates a new random WASD sequence and publishes it to the UI.
     /// Call this only when starting a QTE so the displayed sequence and the
     /// sequence evaluated by input always stay identical.
     /// </summary>
@@ -194,27 +194,27 @@ public sealed class QTEController : MonoBehaviour
         Keyboard keyboard = Keyboard.current;
         if (keyboard != null)
         {
-            if (keyboard.upArrowKey.wasPressedThisFrame)
+            if (keyboard.wKey.wasPressedThisFrame)
             {
-                pressedKey = KeyCode.UpArrow;
+                pressedKey = KeyCode.W;
                 return true;
             }
 
-            if (keyboard.downArrowKey.wasPressedThisFrame)
+            if (keyboard.aKey.wasPressedThisFrame)
             {
-                pressedKey = KeyCode.DownArrow;
+                pressedKey = KeyCode.A;
                 return true;
             }
 
-            if (keyboard.leftArrowKey.wasPressedThisFrame)
+            if (keyboard.sKey.wasPressedThisFrame)
             {
-                pressedKey = KeyCode.LeftArrow;
+                pressedKey = KeyCode.S;
                 return true;
             }
 
-            if (keyboard.rightArrowKey.wasPressedThisFrame)
+            if (keyboard.dKey.wasPressedThisFrame)
             {
-                pressedKey = KeyCode.RightArrow;
+                pressedKey = KeyCode.D;
                 return true;
             }
         }

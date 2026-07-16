@@ -11,6 +11,7 @@ public sealed class TargetingSystem : MonoBehaviour
     [SerializeField, Min(0f)] private float indicatorSpawnInterval = 0.08f;
 
     private readonly Queue<GameObject> activeIndicators = new Queue<GameObject>();
+    private readonly Dictionary<Enemy, GameObject> indicatorsByTarget = new Dictionary<Enemy, GameObject>();
 
     /// <summary>Configures this component when a demo scene is assembled in code.</summary>
     public void Configure(GameObject prefab, float spawnInterval = 0.08f)
@@ -53,6 +54,7 @@ public sealed class TargetingSystem : MonoBehaviour
             GameObject indicator = Instantiate(indicatorPrefab, target.AimPoint.position, Quaternion.identity, target.transform);
             indicator.SetActive(true);
             activeIndicators.Enqueue(indicator);
+            indicatorsByTarget[target] = indicator;
 
             if (indicatorSpawnInterval > 0f)
             {
@@ -74,6 +76,20 @@ public sealed class TargetingSystem : MonoBehaviour
         }
     }
 
+    public void RemoveIndicator(Enemy target)
+    {
+        if (ReferenceEquals(target, null) || !indicatorsByTarget.TryGetValue(target, out GameObject indicator))
+        {
+            return;
+        }
+
+        indicatorsByTarget.Remove(target);
+        if (indicator != null)
+        {
+            Destroy(indicator);
+        }
+    }
+
     public void ClearIndicators()
     {
         while (activeIndicators.Count > 0)
@@ -84,5 +100,7 @@ public sealed class TargetingSystem : MonoBehaviour
                 Destroy(indicator);
             }
         }
+
+        indicatorsByTarget.Clear();
     }
 }
