@@ -284,8 +284,8 @@ MonoBehaviour:
   useDeadZone: 1
   deadZoneLeft: 2
   deadZoneRight: 2
-  deadZoneBottom: 2.8
-  deadZoneTop: 0
+  deadZoneBottom: 2
+  deadZoneTop: 1.7
   drawDeadZoneGizmo: 1
   moveDuration: 0.25
   impactZoomSize: 3.5
@@ -2876,6 +2876,7 @@ MonoBehaviour:
   aKeySprite: {fileID: 8067954521723550107, guid: 6475f8e360b994c7b879279afe2b61da, type: 3}
   sKeySprite: {fileID: 628984580558405906, guid: 1a6f8fcf831bc4b1f8362346edbf20c2, type: 3}
   dKeySprite: {fileID: 4298813270919121201, guid: 6ed350cc81bae445b91594868f45d350, type: 3}
+  hiddenKeySprite: {fileID: -3486339188171217203, guid: dbc3a0081b93e4e7492a57e50efeee81, type: 3}
   waitingColor: {r: 1, g: 1, b: 1, a: 1}
   successColor: {r: 0, g: 1, b: 0, a: 1}
   failColor: {r: 1, g: 0, b: 0, a: 1}
@@ -3855,12 +3856,12 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
   moveSpeed: 8
   jumpForce: 12
-  frictionlessMaterial: {fileID: 6200000, guid: 6f3a87eced87423a84f08dca1246e5c9, type: 2}
+  frictionlessMaterial: {fileID: 0}
   groundCheck: {fileID: 29327384}
   groundLayer:
     serializedVersion: 2
     m_Bits: 8
-  groundCheckSize: {x: 0.72, y: 0.25}
+  groundCheckSize: {x: 0.62, y: 0.12}
   groundCheckDistance: 0.1
   maximumGroundAngle: 60
   oneWayPlatformLayer:
@@ -3868,8 +3869,19 @@ MonoBehaviour:
     m_Bits: 128
   dropThroughDuration: 0.35
   dropDownSpeed: 2
+  enableFallDamage: 1
+  minimumFallDistance: 5
+  additionalDamageDistance: 3
+  baseFallDamage: 1
+  maximumFallDamage: 5
   rebellionCheckInterval: 10
   confusionDurationRange: {x: 3, y: 5}
+  rebellionBorderSprite: {fileID: 7530133896131401480, guid: a23c2025dfbbd400f9a010507b4de5e0, type: 3}
+  rebellionBorderMaximumAlpha: 0.8
+  rebellionBorderFadeInDuration: 0.65
+  rebellionBorderFadeOutDuration: 0.45
+  rebellionBorderPulseSpeed: 1.8
+  rebellionBorderSortingOrder: 500
   anim: {fileID: 1259097847}
   spriteRenderer: {fileID: 0}
   attackDuration: 0.35

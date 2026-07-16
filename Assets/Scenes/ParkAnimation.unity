@@ -442,6 +442,12 @@ MonoBehaviour:
   groundCheckSize: {x: 0.45, y: 0.12}
   groundCheckDistance: 0.1
   maximumGroundAngle: 60
+  rebellionBorderSprite: {fileID: 7530133896131401480, guid: a23c2025dfbbd400f9a010507b4de5e0, type: 3}
+  rebellionBorderMaximumAlpha: 0.8
+  rebellionBorderFadeInDuration: 0.65
+  rebellionBorderFadeOutDuration: 0.45
+  rebellionBorderPulseSpeed: 1.8
+  rebellionBorderSortingOrder: 500
   anim: {fileID: 703705496}
   spriteRenderer: {fileID: 703705497}
   attackDuration: 0.35
