@@ -4792,12 +4792,12 @@ MonoBehaviour:
   maximumFallDamage: 5
   rebellionCheckInterval: 10
   confusionDurationRange: {x: 3, y: 5}
-  rebellionBorderSprite: {fileID: 0}
+  rebellionBorderSprite: {fileID: 7530133896131401480, guid: a23c2025dfbbd400f9a010507b4de5e0, type: 3}
   rebellionBorderMaximumAlpha: 0.8
   rebellionBorderFadeInDuration: 0.65
   rebellionBorderFadeOutDuration: 0.45
   rebellionBorderPulseSpeed: 1.8
-  rebellionBorderSortingOrder: 500
+  rebellionBorderSortingOrder: 30000
   rebellionTestKey: 111
   anim: {fileID: 1259097847}
   spriteRenderer: {fileID: 0}

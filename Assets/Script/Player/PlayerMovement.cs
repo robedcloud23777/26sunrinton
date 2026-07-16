@@ -370,6 +370,7 @@ public class PlayerMovement : MonoBehaviour
             typeof(CanvasGroup));
         Canvas canvas = rebellionEffectCanvas.GetComponent<Canvas>();
         canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+        canvas.overrideSorting = true;
         canvas.sortingOrder = rebellionBorderSortingOrder;
 
         CanvasScaler scaler = rebellionEffectCanvas.GetComponent<CanvasScaler>();
@@ -445,6 +446,11 @@ public class PlayerMovement : MonoBehaviour
     /// <summary>Immediately starts the rebellion effect without a trust probability roll.</summary>
     public void ForceTriggerRebellion()
     {
+        if (rebellionEffectCanvas == null)
+        {
+            CreateRebellionScreenEffect();
+        }
+
         float minDuration = Mathf.Min(confusionDurationRange.x, confusionDurationRange.y);
         float maxDuration = Mathf.Max(confusionDurationRange.x, confusionDurationRange.y);
         invertedControlTimer = UnityEngine.Random.Range(minDuration, maxDuration);
