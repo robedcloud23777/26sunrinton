@@ -429,10 +429,22 @@ MonoBehaviour:
   m_GameObject: {fileID: 703705495}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 89c3e88ee1b2ca644a0a3ba07dd3504a, type: 3}
+  m_Script: {fileID: 11500000, guid: 747636098f9784d4b95ccea04b1741b1, type: 3}
   m_Name: 
-  m_EditorClassIdentifier: Assembly-CSharp::PlayerController
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMovement
+  moveSpeed: 8
+  jumpForce: 12
+  groundCheck: {fileID: 0}
+  groundLayer:
+    serializedVersion: 2
+    m_Bits: 64
+  checkRadius: 0.2
   anim: {fileID: 703705496}
+  spriteRenderer: {fileID: 703705497}
+  attackDuration: 0.35
+  dashDuration: 0.25
+  hurtDuration: 0.4
+  hurtColor: {r: 1, g: 0.5, b: 0.5, a: 1}
 --- !u!50 &703705501
 Rigidbody2D:
   serializedVersion: 5

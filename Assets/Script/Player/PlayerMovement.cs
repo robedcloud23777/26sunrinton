@@ -1,5 +1,7 @@
+using System.Collections;
 using UnityEngine;
-using UnityEngine.InputSystem;  
+
+[RequireComponent(typeof(Rigidbody2D))]
 public class PlayerMovement : MonoBehaviour
 {
     [Header("Movement Settings")]
@@ -7,76 +9,248 @@ public class PlayerMovement : MonoBehaviour
     public float jumpForce = 12f;
 
     [Header("Ground Check (바닥 체크)")]
-    public Transform groundCheck;       // 캐릭터 발밑에 둘 빈 오브젝트
-    public LayerMask groundLayer;       // 바닥으로 인식할 레이어 (예: Ground)
-    public float checkRadius = 0.2f;    // 바닥 감지 범위 반지름
+    public Transform groundCheck;
+    public LayerMask groundLayer = ~0;
+    public float checkRadius = 0.2f;
+
+    [Header("Animation References")]
+    [SerializeField] private Animator anim;
+    [SerializeField] private SpriteRenderer spriteRenderer;
+
+    [Header("Animation Timing")]
+    [SerializeField, Min(0f)] private float attackDuration = 0.35f;
+    [SerializeField, Min(0f)] private float dashDuration = 0.25f;
+    [SerializeField, Min(0f)] private float hurtDuration = 0.4f;
+    [SerializeField] private Color hurtColor = new Color(1f, 0.5f, 0.5f, 1f);
+
+    private static readonly int IsRunningHash = Animator.StringToHash("isRunning");
+    private static readonly int IsGroundedHash = Animator.StringToHash("isGrounded");
+    private static readonly int IsDashingHash = Animator.StringToHash("isDashing");
+    private static readonly int AttackHash = Animator.StringToHash("attack");
+    private static readonly int HurtHash = Animator.StringToHash("hurt");
 
     private Rigidbody2D rb;
+    private Collider2D bodyCollider;
+    private Color originalSpriteColor = Color.white;
     private float horizontalInput;
     private bool isGrounded;
     private bool shouldJump;
     private bool isFacingRight = true;
+    private bool isDashing;
+    private bool isAttacking;
+    private bool isHurt;
 
-    void Start()
+    public bool IsGrounded => isGrounded;
+    public bool IsBusy => isDashing || isAttacking || isHurt;
+
+    private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
+        bodyCollider = GetComponent<Collider2D>();
+
+        if (anim == null)
+        {
+            anim = GetComponent<Animator>();
+        }
+
+        if (spriteRenderer == null)
+        {
+            spriteRenderer = GetComponent<SpriteRenderer>();
+        }
+
+        if (spriteRenderer != null)
+        {
+            originalSpriteColor = spriteRenderer.color;
+        }
+
+        isFacingRight = transform.localScale.x >= 0f;
     }
 
-    void Update()
+    private void Update()
     {
-        // 1. 키보드 입력 받기 (A/D, 좌우 방향키)
-        horizontalInput = Input.GetAxisRaw("Horizontal");
+        if (isHurt || isDashing)
+        {
+            StopHorizontalMovement();
+            return;
+        }
 
-        // 2. 점프 입력 받기 (스페이스바) - 입력 누락 방지를 위해 Update에서 감지
+        if (Input.GetMouseButtonDown(0) && !isAttacking)
+        {
+            StartCoroutine(AttackRoutine());
+        }
+
+        if (isAttacking)
+        {
+            StopHorizontalMovement();
+            return;
+        }
+
+        horizontalInput = Input.GetAxisRaw("Horizontal");
+        SetAnimatorBool(IsRunningHash, !Mathf.Approximately(horizontalInput, 0f));
+        FlipTowardsInput();
+
         if (Input.GetButtonDown("Jump") && isGrounded)
         {
             shouldJump = true;
         }
 
-        // 3. 캐릭터 방향 전환 (Flip)
-        Flip();
+        if (Input.GetKeyDown(KeyCode.LeftShift))
+        {
+            StartCoroutine(DashRoutine());
+        }
+
+        // Temporary test input. Gameplay damage can call PlayHurt() directly.
+        if (Input.GetKeyDown(KeyCode.G))
+        {
+            PlayHurt();
+        }
     }
 
-    void FixedUpdate()
+    private void FixedUpdate()
     {
-        // 4. 실제로 바닥에 닿아있는지 체크
-        isGrounded = Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer);
+        isGrounded = CheckGrounded();
+        SetAnimatorBool(IsGroundedHash, isGrounded);
 
-        // 5. 좌우 이동 적용 (물리 속도 변경)
         Move();
-
-        // 6. 점프 적용
-        if (shouldJump)
+        if (shouldJump && !IsBusy)
         {
             Jump();
         }
     }
 
-    void Move()
+    private bool CheckGrounded()
     {
-        // Y축 속도(중력 가속도)는 그대로 유지하면서, X축 속도만 입력값에 맞춰 설정합니다.
-        rb.linearVelocity = new Vector2(horizontalInput * moveSpeed, rb.linearVelocity.y);
+        if (groundCheck != null)
+        {
+            return Physics2D.OverlapCircle(groundCheck.position, checkRadius, groundLayer) != null;
+        }
+
+        if (bodyCollider != null)
+        {
+            return bodyCollider.IsTouchingLayers(groundLayer);
+        }
+
+        return false;
     }
 
-    void Jump()
+    private void Move()
+    {
+        float velocityX = IsBusy ? 0f : horizontalInput * moveSpeed;
+        rb.linearVelocity = new Vector2(velocityX, rb.linearVelocity.y);
+    }
+
+    private void Jump()
     {
         rb.linearVelocity = new Vector2(rb.linearVelocity.x, jumpForce);
         shouldJump = false;
+        isGrounded = false;
+        SetAnimatorBool(IsGroundedHash, false);
     }
 
-    // 가는 방향에 맞춰 캐릭터 이미지를 좌우로 뒤집는 함수
-    void Flip()
+    private void StopHorizontalMovement()
     {
-        if ((horizontalInput > 0 && !isFacingRight) || (horizontalInput < 0 && isFacingRight))
+        horizontalInput = 0f;
+        shouldJump = false;
+        SetAnimatorBool(IsRunningHash, false);
+    }
+
+    private void FlipTowardsInput()
+    {
+        if ((horizontalInput > 0f && !isFacingRight) || (horizontalInput < 0f && isFacingRight))
         {
             isFacingRight = !isFacingRight;
             Vector3 scale = transform.localScale;
-            scale.x *= -1;
+            scale.x *= -1f;
             transform.localScale = scale;
         }
     }
 
-    // 에디터 뷰에서 바닥 체크 범위를 빨간색 원으로 시각화해 줍니다. (디버깅용)
+    private IEnumerator AttackRoutine()
+    {
+        isAttacking = true;
+        StopHorizontalMovement();
+        SetAnimatorTrigger(AttackHash);
+
+        yield return new WaitForSeconds(attackDuration);
+        isAttacking = false;
+    }
+
+    private IEnumerator DashRoutine()
+    {
+        isDashing = true;
+        StopHorizontalMovement();
+        SetAnimatorBool(IsDashingHash, true);
+
+        yield return new WaitForSeconds(dashDuration);
+
+        SetAnimatorBool(IsDashingHash, false);
+        isDashing = false;
+    }
+
+    public void PlayHurt()
+    {
+        if (isHurt)
+        {
+            return;
+        }
+
+        StartCoroutine(HurtRoutine());
+    }
+
+    private IEnumerator HurtRoutine()
+    {
+        isHurt = true;
+        StopHorizontalMovement();
+        SetAnimatorTrigger(HurtHash);
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = hurtColor;
+        }
+
+        yield return new WaitForSeconds(hurtDuration);
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = originalSpriteColor;
+        }
+
+        isHurt = false;
+    }
+
+    private void SetAnimatorBool(int parameter, bool value)
+    {
+        if (anim != null)
+        {
+            anim.SetBool(parameter, value);
+        }
+    }
+
+    private void SetAnimatorTrigger(int parameter)
+    {
+        if (anim != null)
+        {
+            anim.SetTrigger(parameter);
+        }
+    }
+
+    private void OnDisable()
+    {
+        StopAllCoroutines();
+        horizontalInput = 0f;
+        shouldJump = false;
+        isDashing = false;
+        isAttacking = false;
+        isHurt = false;
+        SetAnimatorBool(IsRunningHash, false);
+        SetAnimatorBool(IsDashingHash, false);
+
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.color = originalSpriteColor;
+        }
+    }
+
     private void OnDrawGizmosSelected()
     {
         if (groundCheck != null)
