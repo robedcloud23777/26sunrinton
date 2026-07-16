@@ -13,6 +13,12 @@ public sealed class CombatQTEDemoBootstrap : MonoBehaviour
     [SerializeField] private bool beginCombatAutomatically = true;
     [SerializeField, Min(0f)] private float combatStartDelay = 1f;
 
+    [Header("QTE Key Sprites")]
+    [SerializeField] private Sprite wKeySprite;
+    [SerializeField] private Sprite aKeySprite;
+    [SerializeField] private Sprite sKeySprite;
+    [SerializeField] private Sprite dKeySprite;
+
     private readonly Color backgroundColor = new Color(0.055f, 0.075f, 0.13f);
     private readonly Color groundColor = new Color(0.13f, 0.17f, 0.25f);
 
@@ -133,6 +139,7 @@ public sealed class CombatQTEDemoBootstrap : MonoBehaviour
 
         QTEUIManager uiManager = canvasObject.AddComponent<QTEUIManager>();
         uiManager.Configure(qteController, containerObject.transform, CreateArrowPrefab());
+        uiManager.ConfigureKeySprites(wKeySprite, aKeySprite, sKeySprite, dKeySprite);
     }
 
     private GameObject CreateArrowPrefab()

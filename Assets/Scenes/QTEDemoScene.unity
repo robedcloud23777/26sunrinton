@@ -165,6 +165,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::CombatQTEDemoBootstrap
   beginCombatAutomatically: 1
   combatStartDelay: 1
+  wKeySprite: {fileID: 1876778454472326815, guid: 7a9a8cff053ad4e2ea9a61ff2224c83e, type: 3}
+  aKeySprite: {fileID: 8067954521723550107, guid: 6475f8e360b994c7b879279afe2b61da, type: 3}
+  sKeySprite: {fileID: 628984580558405906, guid: 1a6f8fcf831bc4b1f8362346edbf20c2, type: 3}
+  dKeySprite: {fileID: 4298813270919121201, guid: 6ed350cc81bae445b91594868f45d350, type: 3}
 --- !u!1 &200000
 GameObject:
   m_ObjectHideFlags: 0
