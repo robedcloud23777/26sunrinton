@@ -4,8 +4,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 /// <summary>
-/// Coordinates the combat sequence: introduction, dash, QTE resolution, and
-/// recovery.  Other systems subscribe to its events instead of changing state.
+/// Coordinates the combat sequence: approach alignment, QTE input, slash dash,
+/// and recovery. Other systems subscribe to its events instead of changing state.
 /// </summary>
 public sealed class CombatManager : MonoBehaviour
 {
@@ -34,9 +34,16 @@ public sealed class CombatManager : MonoBehaviour
 
     [Header("Sequence Timing")]
     [SerializeField, Min(0f)] private float introDelay = 0.5f;
-    [SerializeField, Min(0.01f)] private float dashDuration = 0.2f;
+    [SerializeField, Min(0.01f)] private float positioningDuration = 0.35f;
+    [SerializeField, Min(0.01f)] private float slashDuration = 0.16f;
     [SerializeField, Min(0.01f)] private float rollbackDuration = 0.5f;
     [SerializeField, Min(0)] private int damageOnQTEFail = 1;
+
+    [Header("Slash Positioning")]
+    [Tooltip("Distance kept from the target while the player enters QTE input.")]
+    [SerializeField, Min(0.1f)] private float qteStartDistance = 1.25f;
+    [Tooltip("Distance travelled past the target on a successful slash.")]
+    [SerializeField, Min(0f)] private float slashOvershootDistance = 0.7f;
 
     public event Action<int> OnPlayerDamaged;
     public event Action OnCombatCompleted;
@@ -47,6 +54,7 @@ public sealed class CombatManager : MonoBehaviour
     private Queue<Enemy> targetQueue = new Queue<Enemy>();
     private Enemy currentTarget;
     private Coroutine activeSequence;
+    private Vector3 attackDirection = Vector3.right;
 
     private void Awake()
     {
@@ -106,8 +114,10 @@ public sealed class CombatManager : MonoBehaviour
         safeRollbackPosition = player.position;
         targetQueue = targetingSystem.GetSortedTargets(player, enemyGroup);
         SetPlayerControl(false);
+        cameraController?.EnterCombat(playerTransform);
 
         currentState = CombatState.Intro;
+        CinematicModeUI.Instance.EnterCinematicMode();
         activeSequence = StartCoroutine(IntroRoutine());
     }
 
@@ -124,10 +134,14 @@ public sealed class CombatManager : MonoBehaviour
             yield return new WaitForSecondsRealtime(introDelay);
         }
 
-        ExecuteNextDash();
+        PrepareNextAttack();
     }
 
-    private void ExecuteNextDash()
+    /// <summary>
+    /// Selects the next enemy and moves the player to a cardinal attack line.
+    /// QTE input starts only after the player is naturally positioned beside it.
+    /// </summary>
+    private void PrepareNextAttack()
     {
         RemoveMissingTargets();
         if (targetQueue.Count == 0)
@@ -138,38 +152,41 @@ public sealed class CombatManager : MonoBehaviour
 
         currentState = CombatState.Dashing;
         currentTarget = targetQueue.Peek();
-        activeSequence = StartCoroutine(DashRoutine(currentTarget));
+        activeSequence = StartCoroutine(PositionForQTERoutine(currentTarget));
     }
 
-    private IEnumerator DashRoutine(Enemy target)
+    private IEnumerator PositionForQTERoutine(Enemy target)
     {
         if (target == null)
         {
-            ExecuteNextDash();
+            PrepareNextAttack();
             yield break;
         }
 
         Vector3 start = playerTransform.position;
-        Vector3 destination = target.AimPoint.position;
+        Vector3 targetPosition = target.AimPoint.position;
+        attackDirection = GetCardinalDirection(start, targetPosition);
+        Vector3 destination = targetPosition - attackDirection * qteStartDistance;
         float elapsed = 0f;
 
-        while (elapsed < dashDuration)
+        while (elapsed < positioningDuration)
         {
             if (target == null)
             {
-                ExecuteNextDash();
+                PrepareNextAttack();
                 yield break;
             }
 
             elapsed += Time.unscaledDeltaTime;
-            playerTransform.position = Vector3.Lerp(start, destination, elapsed / dashDuration);
+            float t = Mathf.SmoothStep(0f, 1f, elapsed / positioningDuration);
+            playerTransform.position = Vector3.Lerp(start, destination, t);
             yield return null;
         }
 
         playerTransform.position = destination;
         if (target == null)
         {
-            ExecuteNextDash();
+            PrepareNextAttack();
             yield break;
         }
 
@@ -180,7 +197,7 @@ public sealed class CombatManager : MonoBehaviour
     {
         if (currentTarget == null)
         {
-            ExecuteNextDash();
+            PrepareNextAttack();
             return;
         }
 
@@ -202,10 +219,45 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         currentState = CombatState.Resolution;
-        if (currentTarget != null)
+        activeSequence = StartCoroutine(SlashThroughTargetRoutine(currentTarget));
+    }
+
+    /// <summary>
+    /// A successful QTE turns the prepared attack line into a fast, straight
+    /// slash that finishes beyond the enemy. The enemy is removed only after
+    /// the player has passed through it.
+    /// </summary>
+    private IEnumerator SlashThroughTargetRoutine(Enemy target)
+    {
+        if (target == null)
         {
-            feedbackManager?.PlaySlashFeedback(currentTarget.AimPoint.position);
-            Destroy(currentTarget.gameObject);
+            PrepareNextAttack();
+            yield break;
+        }
+
+        Vector3 start = playerTransform.position;
+        Vector3 targetPosition = target.AimPoint.position;
+        attackDirection = GetCardinalDirection(start, targetPosition);
+        Vector3 destination = targetPosition + attackDirection * slashOvershootDistance;
+        feedbackManager?.PlaySlashFeedback(targetPosition);
+
+        float elapsed = 0f;
+        while (elapsed < slashDuration)
+        {
+            if (target == null)
+            {
+                break;
+            }
+
+            elapsed += Time.unscaledDeltaTime;
+            playerTransform.position = Vector3.Lerp(start, destination, elapsed / slashDuration);
+            yield return null;
+        }
+
+        playerTransform.position = destination;
+        if (target != null)
+        {
+            Destroy(target.gameObject);
         }
 
         if (targetQueue.Count > 0)
@@ -214,7 +266,7 @@ public sealed class CombatManager : MonoBehaviour
             targetingSystem.RemoveFirstIndicator();
         }
 
-        ExecuteNextDash();
+        PrepareNextAttack();
     }
 
     private void HandleQTEFail()
@@ -249,7 +301,7 @@ public sealed class CombatManager : MonoBehaviour
         }
 
         playerTransform.position = safeRollbackPosition;
-        ExecuteNextDash();
+        PrepareNextAttack();
     }
 
     private void RemoveMissingTargets()
@@ -261,9 +313,21 @@ public sealed class CombatManager : MonoBehaviour
         }
     }
 
+    private static Vector3 GetCardinalDirection(Vector3 from, Vector3 to)
+    {
+        Vector3 offset = to - from;
+        if (Mathf.Abs(offset.x) >= Mathf.Abs(offset.y))
+        {
+            return new Vector3(Mathf.Approximately(offset.x, 0f) ? 1f : Mathf.Sign(offset.x), 0f, 0f);
+        }
+
+        return new Vector3(0f, Mathf.Approximately(offset.y, 0f) ? 1f : Mathf.Sign(offset.y), 0f);
+    }
+
     private void EndCombat()
     {
         currentState = CombatState.Outro;
+        CinematicModeUI.Instance.ExitCinematicMode();
         targetingSystem.ClearIndicators();
         cameraController?.ResetCamera(playerTransform);
         SetPlayerControl(true);
