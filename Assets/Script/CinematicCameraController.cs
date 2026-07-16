@@ -29,14 +29,14 @@ public sealed class CinematicCameraController : MonoBehaviour
         initialOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : 0f;
     }
 
-    private void LateUpdate()
+    private void FixedUpdate()
     {
         if (isCombatCameraActive || activeAnimation != null || followTarget == null)
         {
             return;
         }
 
-        float t = 1f - Mathf.Exp(-followSharpness * Time.unscaledDeltaTime);
+        float t = 1f - Mathf.Exp(-followSharpness * Time.fixedUnscaledDeltaTime);
         transform.position = Vector3.Lerp(transform.position, followTarget.position + followOffset, t);
     }
 
