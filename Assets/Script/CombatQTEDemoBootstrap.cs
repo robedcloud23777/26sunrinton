@@ -40,6 +40,8 @@ public sealed class CombatQTEDemoBootstrap : MonoBehaviour
             cameraController = camera.gameObject.AddComponent<CinematicCameraController>();
         }
 
+        cameraController.SetFollowTarget(player);
+
         targetingSystem.Configure(CreateIndicatorPrefab());
         feedbackManager.Configure(
             CreateEffectPrefab("Slash Effect Prefab", new Color(1f, 0.95f, 0.35f), new Vector3(1.6f, 0.25f, 1f)),

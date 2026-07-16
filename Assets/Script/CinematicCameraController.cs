@@ -1,17 +1,23 @@
 using System.Collections;
 using UnityEngine;
 
-/// <summary>Small, dependency-free camera animator for combat framing.</summary>
+/// <summary>Interpolates after the player during exploration and takes over for combat framing.</summary>
 public sealed class CinematicCameraController : MonoBehaviour
 {
+    [Header("Exploration Follow")]
     [SerializeField] private Camera targetCamera;
+    [SerializeField] private Transform followTarget;
+    [SerializeField] private Vector3 followOffset = new Vector3(0f, 0f, -10f);
+    [SerializeField, Min(0.01f)] private float followSharpness = 8f;
+
+    [Header("Combat Framing")]
     [SerializeField, Min(0.01f)] private float moveDuration = 0.25f;
     [SerializeField, Min(0.01f)] private float impactZoomSize = 3.5f;
     [SerializeField] private Vector3 arenaOffset = new Vector3(0f, 0f, -10f);
 
-    private Vector3 initialPosition;
     private float initialOrthographicSize;
     private Coroutine activeAnimation;
+    private bool isCombatCameraActive;
 
     private void Awake()
     {
@@ -20,24 +26,59 @@ public sealed class CinematicCameraController : MonoBehaviour
             targetCamera = GetComponent<Camera>();
         }
 
-        initialPosition = transform.position;
         initialOrthographicSize = targetCamera != null ? targetCamera.orthographicSize : 0f;
+    }
+
+    private void LateUpdate()
+    {
+        if (isCombatCameraActive || activeAnimation != null || followTarget == null)
+        {
+            return;
+        }
+
+        float t = 1f - Mathf.Exp(-followSharpness * Time.unscaledDeltaTime);
+        transform.position = Vector3.Lerp(transform.position, followTarget.position + followOffset, t);
+    }
+
+    /// <summary>Assigns the player that is followed while no combat camera is active.</summary>
+    public void SetFollowTarget(Transform player)
+    {
+        followTarget = player;
+    }
+
+    /// <summary>Stops normal player follow so combat framing can take over.</summary>
+    public void EnterCombat(Transform player)
+    {
+        SetFollowTarget(player);
+        isCombatCameraActive = true;
     }
 
     public void MoveToArenaCenter(Vector3 arenaCenter)
     {
+        isCombatCameraActive = true;
         AnimateTo(arenaCenter + arenaOffset, initialOrthographicSize);
     }
 
     public void ZoomOnImpact(Vector3 impactPosition)
     {
+        isCombatCameraActive = true;
         AnimateTo(impactPosition + arenaOffset, impactZoomSize);
     }
 
+    /// <summary>Restores the exploration zoom, then resumes interpolated player follow.</summary>
     public void ResetCamera(Transform player)
     {
-        Vector3 destination = player != null ? player.position + arenaOffset : initialPosition;
-        AnimateTo(destination, initialOrthographicSize);
+        SetFollowTarget(player);
+        isCombatCameraActive = false;
+
+        if (activeAnimation != null)
+        {
+            StopCoroutine(activeAnimation);
+            activeAnimation = null;
+        }
+
+        // Keep the current position so the follow interpolation performs the return movement.
+        AnimateTo(transform.position, initialOrthographicSize);
     }
 
     private void AnimateTo(Vector3 destination, float orthographicSize)
