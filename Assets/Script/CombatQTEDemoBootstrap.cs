@@ -1,4 +1,4 @@
-using System.Collections;
+    using System.Collections;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -34,7 +34,11 @@ public sealed class CombatQTEDemoBootstrap : MonoBehaviour
         QTEController qteController = gameObject.AddComponent<QTEController>();
         TargetingSystem targetingSystem = gameObject.AddComponent<TargetingSystem>();
         CombatFeedbackManager feedbackManager = gameObject.AddComponent<CombatFeedbackManager>();
-        CinematicCameraController cameraController = camera.gameObject.AddComponent<CinematicCameraController>();
+        CinematicCameraController cameraController = camera.GetComponent<CinematicCameraController>();
+        if (cameraController == null)
+        {
+            cameraController = camera.gameObject.AddComponent<CinematicCameraController>();
+        }
 
         targetingSystem.Configure(CreateIndicatorPrefab());
         feedbackManager.Configure(
