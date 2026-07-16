@@ -37,6 +37,7 @@ public sealed class CombatManager : MonoBehaviour
     [SerializeField, Min(0.01f)] private float positioningDuration = 0.35f;
     [SerializeField, Min(0.01f)] private float slashDuration = 0.16f;
     [SerializeField, Min(0.01f)] private float rollbackDuration = 0.5f;
+    [SerializeField, Min(0f)] private float finalEnemyDefeatDelay = 1f;
     [SerializeField, Min(0)] private int damageOnQTEFail = 1;
 
     [Header("Slash Positioning")]
@@ -264,6 +265,20 @@ public sealed class CombatManager : MonoBehaviour
         {
             targetQueue.Dequeue();
             targetingSystem.RemoveFirstIndicator();
+        }
+
+        RemoveMissingTargets();
+        if (targetQueue.Count == 0)
+        {
+            // Keep the impact framing and slash landing visible before leaving combat.
+            currentState = CombatState.Outro;
+            if (finalEnemyDefeatDelay > 0f)
+            {
+                yield return new WaitForSecondsRealtime(finalEnemyDefeatDelay);
+            }
+
+            EndCombat();
+            yield break;
         }
 
         PrepareNextAttack();
